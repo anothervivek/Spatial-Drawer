@@ -185,6 +185,28 @@ def process_events():
             print(f"[Spectacles] Color → index {color_idx} = {color}")
             continue
 
+        # ── Erase ─────────────────────────────────────────────────────────────
+        if action == "erase":
+            bx, by, bz = world_to_blender(pt.get("x", 0), pt.get("y", 0), pt.get("z", 0))
+            min_dist       = float('inf')
+            curve_to_erase = None
+            
+            for cid, entry in curve_registry.items():
+                ax, ay, az = entry["anchor"]
+                d = math.sqrt((ax - bx)**2 + (ay - by)**2 + (az - bz)**2)
+                if d < min_dist:
+                    min_dist       = d
+                    curve_to_erase = cid
+            
+            if curve_to_erase and min_dist < 15.0 * bpy.context.scene.spectacles_scale:
+                entry = curve_registry.pop(curve_to_erase)
+                try: bpy.data.objects.remove(entry["obj"], do_unlink=True)
+                except: pass
+                active_strokes.pop(curve_to_erase, None)
+                if curve_to_erase in drawn_stack: drawn_stack.remove(curve_to_erase)
+                print(f"[Spectacles] Erased curve {curve_to_erase[-8:]} (dist={min_dist:.1f})")
+            continue
+
         # ── Grab Start ────────────────────────────────────────────────────────
         if action == "grab-start":
             bx, by, bz = world_to_blender(pt.get("x", 0), pt.get("y", 0), pt.get("z", 0))
@@ -265,7 +287,8 @@ def process_events():
                 if bpy.context.scene.spectacles_dynamic_thickness:
                     dx = bx - last_pos[0]; dy = by - last_pos[1]; dz = bz - last_pos[2]
                     dist = math.sqrt(dx*dx + dy*dy + dz*dz)
-                    bp.radius = max(0.1, min(2.0, 0.5 / max(0.01, dist)))
+                    # Smooth mapped radius
+                    bp.radius = max(0.2, min(1.5, 0.4 / max(0.01, dist)))
                 else:
                     bp.radius = 1.0
 

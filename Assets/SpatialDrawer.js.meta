@@ -31,6 +31,7 @@
     btnColor3: false
     btnColor4: false
     btnColors: false
+    btnEraser: false
     btnPoly: false
     btnRibbon: false
     btnSetOrigin: false
@@ -56,6 +57,7 @@
       btnTube: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       btnRibbon: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       btnPoly: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      btnEraser: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       btnSetOrigin: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       btnUndo: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       btnColors: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000

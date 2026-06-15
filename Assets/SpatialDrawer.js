@@ -10,6 +10,7 @@
 // @input SceneObject btnTube {"hint": "Button visual for Tube brush"}
 // @input SceneObject btnRibbon {"hint": "Button visual for Ribbon brush"}
 // @input SceneObject btnPoly {"hint": "Button visual for Polyline brush"}
+// @input SceneObject btnEraser {"hint": "Button visual for Eraser"}
 // @input SceneObject btnSetOrigin {"hint": "Button visual for Set Origin"}
 // @input SceneObject btnUndo {"hint": "Button visual for Undo"}
 // @input SceneObject btnColors {"hint": "Button visual for Colors (parent)"}
@@ -46,7 +47,7 @@ const leftHand  = SIK.HandInputData.getHand("left");
 // IDENTITY & STATE
 // ─────────────────────────────────────────────────────────────────────────────
 var userId    = "user_" + Math.random().toString(36).substr(2, 6);
-var brushMode = "tube";   // "tube" | "ribbon" | "polyline"
+var brushMode = "tube";   // "tube" | "ribbon" | "polyline" | "eraser"
 
 var isConnected    = false;
 var client         = null;
@@ -63,6 +64,7 @@ var lastRightPinchMs = 0;
 var pinchHoldTimer   = 0;
 var GRAB_HOLD_SEC    = 1.0;
 var lastGrabPos      = null;
+var lastSendPos      = null;
 
 // Left hand pinch state (for feeding to radial menu)
 var leftPinching       = false;
@@ -111,6 +113,7 @@ function buildRadialMenu() {
     var bTube    = radialMenu.addButton(getOrCreateButton(script.btnTube, "tube"),      "tube");
     var bRibbon  = radialMenu.addButton(getOrCreateButton(script.btnRibbon, "ribbon"),    "ribbon");
     var bPoly    = radialMenu.addButton(getOrCreateButton(script.btnPoly, "poly"),      "poly");
+    var bEraser  = radialMenu.addButton(getOrCreateButton(script.btnEraser, "eraser"),    "eraser");
     var bColors  = radialMenu.addButton(getOrCreateButton(script.btnColors, "colors"),    "colors");
     var bOrigin  = radialMenu.addButton(getOrCreateButton(script.btnSetOrigin, "origin"), "origin");
     var bUndo    = radialMenu.addButton(getOrCreateButton(script.btnUndo, "undo"),      "undo");
@@ -137,6 +140,12 @@ function buildRadialMenu() {
     bPoly.onPress.add(function() {
         brushMode = "polyline";
         print("[SpatialDrawer] Brush → POLYLINE");
+    });
+
+    bEraser.onPress.add(function() {
+        brushMode = "eraser";
+        polylineActive = false;
+        print("[SpatialDrawer] Brush → ERASER");
     });
 
     // ── Set Origin callback ────────────────────────────────────────────────
@@ -267,6 +276,13 @@ function onRightPinchDown() {
             extras.fx = fwd.x; extras.fy = fwd.y; extras.fz = fwd.z;
         }
 
+        if (brushMode === "eraser") {
+            send("erase", pos, null);
+            lastSendTimeMs = nowMs;
+            print("[SpatialDrawer] ERASE triggered");
+            return;
+        }
+
         if (brushMode === "polyline") {
             if (!polylineActive) {
                 send("start", pos, extras);
@@ -279,6 +295,7 @@ function onRightPinchDown() {
         } else {
             send("start", pos, extras);
             lastSendTimeMs = nowMs;
+            lastSendPos    = pos;
             print("[SpatialDrawer] Draw START [" + brushMode + "]");
         }
     } catch (e) {
@@ -384,16 +401,30 @@ function onUpdate() {
             return;
         }
 
-        // ── Draw streaming ───────────────────────────────────────────────
-        if (!isDrawing || !rightHand.isTracked() || brushMode === "polyline") return;
-        if (nowMs - lastSendTimeMs > sendIntervalMs) {
-            var extras = {};
-            if (brushMode === "ribbon") {
-                var fwd = rightHand.indexTip.forward;
-                extras.fx = fwd.x; extras.fy = fwd.y; extras.fz = fwd.z;
+        // ── Erase streaming ──────────────────────────────────────────────
+        if (isDrawing && brushMode === "eraser" && rightHand.isTracked()) {
+            if (nowMs - lastSendTimeMs > 200) {
+                send("erase", rightHand.indexTip.position, null);
+                lastSendTimeMs = nowMs;
             }
-            send("move", rightHand.indexTip.position, extras);
-            lastSendTimeMs = nowMs;
+            return;
+        }
+
+        // ── Draw streaming ───────────────────────────────────────────────
+        if (!isDrawing || !rightHand.isTracked() || brushMode === "polyline" || brushMode === "eraser") return;
+        var currentPos = rightHand.indexTip.position;
+        if (nowMs - lastSendTimeMs > sendIntervalMs) {
+            // Smoothing: Only send a point if the hand has moved more than 1.5cm
+            if (!lastSendPos || currentPos.distance(lastSendPos) > 1.5) {
+                var extras = {};
+                if (brushMode === "ribbon") {
+                    var fwd = rightHand.indexTip.forward;
+                    extras.fx = fwd.x; extras.fy = fwd.y; extras.fz = fwd.z;
+                }
+                send("move", currentPos, extras);
+                lastSendTimeMs = nowMs;
+                lastSendPos = currentPos;
+            }
         }
 
     } catch (e) {
