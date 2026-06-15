@@ -1,0 +1,47 @@
+- !<AssetImportMetadata/8a644243-4052-1e6c-0fb8-689602dd1f00>
+  ImportedAssetIds:
+    JavaScriptAsset: !<reference> 177bb9c0-1305-460b-a624-a35c97e0d8ca
+  ImporterName: JavaScriptAssetImporter
+  PrimaryAsset: !<reference> 177bb9c0-1305-460b-a624-a35c97e0d8ca
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    AssetLibraryId: 2v4Ak5pSkHZrOnMR6udt9X
+  AssetDataMap:
+    JavaScriptAsset: !<own> 50088805-1cf5-41df-ba96-fb1f3ca7e786
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<ScriptAssetData/50088805-1cf5-41df-ba96-fb1f3ca7e786>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: |-
+    LSQuickScripts - A cheat sheet of Lens Studio Javascript snippets that I often use.
+    
+    Max van Leeuwen
+    maxvanleeuwen.com
+  VersionMajor: 1
+  VersionMinor: 0
+  VersionPatch: 0
+  ComponentUid: e3598661-a91b-8c57-9618-26246dfc6a5d
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    {}
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    -
+      {}
+  ScriptTypes:
+    -
+      {}

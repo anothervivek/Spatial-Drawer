@@ -1,0 +1,68 @@
+- !<AssetImportMetadata/e34130b5-567b-457c-915e-2603050686ce>
+  ImportedAssetIds:
+    JavaScriptAsset: !<reference> 0af988b6-9f91-40f5-b0ca-4378f343a11d
+  ImporterName: JavaScriptAssetImporter
+  PrimaryAsset: !<reference> 0af988b6-9f91-40f5-b0ca-4378f343a11d
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    JavaScriptAsset: !<own> 6896bcf1-0653-49fe-9c82-8bf2495b57e9
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<ScriptAssetData/6896bcf1-0653-49fe-9c82-8bf2495b57e9>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  ComponentUid: 2da5877f-9bfa-4f83-953c-b0cffa1e5c43
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    btnColor1: false
+    btnColor2: false
+    btnColor3: false
+    btnColor4: false
+    btnColors: false
+    btnPoly: false
+    btnRibbon: false
+    btnSetOrigin: false
+    btnTube: false
+    btnUndo: false
+    channelName: false
+    gridPlane: false
+    originGizmo: false
+    supabaseProject: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - supabaseProject: !<reference.SupabaseProject> 00000000-0000-0000-0000-000000000000
+      channelName: spatial-drawer
+      originGizmo: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      gridPlane: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      btnTube: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      btnRibbon: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      btnPoly: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      btnSetOrigin: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      btnUndo: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      btnColors: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      btnColor1: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      btnColor2: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      btnColor3: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      btnColor4: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+  ScriptTypes:
+    -
+      {}

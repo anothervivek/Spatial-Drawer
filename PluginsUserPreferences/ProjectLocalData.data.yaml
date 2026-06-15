@@ -1,0 +1,12 @@
+data:
+  externalSources:
+    - 02fd0a82-b7fe-4db6-b6f2-3f02ea23e45f: /Applications/Lens Studio.app/Contents/JsPlugins/PresetsRegistry/Assets/Resources/Normal.png
+    - 0bb197bd-76a1-46a8-8feb-a1be7a7f28fd: /Users/viveksingh/Library/Preferences/Snap/Lens Studio/LibraryComponents/SupabaseClient@0.0.12/SupabaseClient.lspkg
+    - 18e58046-eeef-4b58-91a6-da8816d08ebd: /Users/viveksingh/Library/Preferences/Snap/Lens Studio/LibraryComponents/Utilities@1.0.0/Utilities.lspkg
+    - 19623f8c-7191-4d02-ac9f-69218aed2fa1: /Applications/Lens Studio.app/Contents/JsPlugins/PresetsRegistry/Assets/Meshes/Resources/Plane.mesh
+    - 1cbba1b7-3c9c-4b19-a751-009fdc2da37d: /Applications/Lens Studio.app/Contents/JsPlugins/PresetsRegistry/Assets/Resources/MaterialParams.png
+    - 3ade9e6d-6b98-43ee-9a6c-ea0a063b6cd5: /Applications/Lens Studio.app/Contents/JsPlugins/PresetsRegistry/Assets/Resources/Base.png
+    - 4e3660c5-2259-4f69-a492-88dfbade5be2: /Users/viveksingh/Downloads/source 27/testGizmo.fbx
+    - 6d241a19-4e10-4400-99b5-88003ccf6069: /Users/viveksingh/Library/Preferences/Snap/Lens Studio/LibraryComponents/SnapDecorators@1.0.0/SnapDecorators.lspkg
+    - 9128bb93-ba36-4cb8-8442-dbdd8cf24e17: /Applications/Lens Studio.app/Contents/JsPlugins/PresetsRegistry/Assets/PBRMaterial/Resources/pbr.ss_graph
+    - 9757a52c-c6c9-4528-903f-7a53530677e8: /Applications/Lens Studio.app/Contents/Plugins/Es_ShaderGraph_Presets.bundle/Assets/Empty.ss_graph

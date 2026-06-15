@@ -1,0 +1,9 @@
+node_modules/
+.DS_Store
+__pycache__/
+
+# Lens Studio
+.LSProjectCache
+Cache/
+Entities/
+*.backup
