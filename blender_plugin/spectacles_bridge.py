@@ -5,6 +5,8 @@ import time
 import sys
 import subprocess
 import math
+import os
+import time
 
 try:
     import websocket
@@ -205,6 +207,119 @@ def process_events():
                 active_strokes.pop(curve_to_erase, None)
                 if curve_to_erase in drawn_stack: drawn_stack.remove(curve_to_erase)
                 print(f"[Spectacles] Erased curve {curve_to_erase[-8:]} (dist={min_dist:.1f})")
+            continue
+
+        # ── Export ────────────────────────────────────────────────────────────
+        if action == "export":
+            print("[Spectacles] Exporting drawings to FBX...")
+            if not curve_registry:
+                print("[Spectacles] Nothing to export.")
+                continue
+
+            bpy.ops.object.select_all(action='DESELECT')
+            dupe_objs = []
+            for cid, entry in curve_registry.items():
+                entry["obj"].select_set(True)
+            bpy.ops.object.duplicate()
+            for obj in bpy.context.selected_objects:
+                dupe_objs.append(obj)
+            
+            bpy.context.view_layer.objects.active = dupe_objs[0]
+            bpy.ops.object.convert(target='MESH')
+            bpy.ops.object.join()
+            active_obj = bpy.context.view_layer.objects.active
+            active_obj.name = "SpatialDrawing_Export"
+            
+            desktop = os.path.join(os.path.expanduser("~"), "Desktop")
+            filename = f"SpatialDrawing_{int(time.time())}.fbx"
+            filepath = os.path.join(desktop, filename)
+            
+            try:
+                bpy.ops.export_scene.fbx(
+                    filepath=filepath,
+                    use_selection=True,
+                    path_mode='COPY',
+                    embed_textures=True
+                )
+                print(f"[Spectacles] Exported successfully to {filepath}")
+            except Exception as e:
+                print(f"[Spectacles] Export failed: {e}")
+                
+            bpy.ops.object.delete()
+            continue
+
+        # ── AI Generate ───────────────────────────────────────────────────────
+        if action == "ai-generate":
+            key = bpy.context.scene.spectacles_tripo_key
+            if not key:
+                print("[Spectacles] Error: Tripo3D API key missing! Add it in the panel.")
+                continue
+            
+            if not curve_registry:
+                print("[Spectacles] Error: Nothing to generate from!")
+                continue
+
+            print("[Spectacles] Capturing sketch for AI...")
+            sc = bpy.context.scene
+            orig_engine = sc.render.engine
+            sc.render.engine = 'BLENDER_WORKBENCH'
+            
+            cam = sc.camera
+            if not cam:
+                cam_data = bpy.data.cameras.new("AICam")
+                cam = bpy.data.objects.new("AICam", cam_data)
+                bpy.context.collection.objects.link(cam)
+                sc.camera = cam
+                cam.location = (0, -10, 5)
+                cam.rotation_euler = (math.radians(60), 0, 0)
+                
+            import tempfile
+            img_path = os.path.join(tempfile.gettempdir(), "spectacles_sketch.png")
+            sc.render.resolution_x = 512
+            sc.render.resolution_y = 512
+            sc.render.filepath = img_path
+            
+            bpy.ops.render.render(write_still=True)
+            sc.render.engine = orig_engine
+            
+            print("[Spectacles] Sending to Tripo3D API...")
+            def on_ai_done(glb_path):
+                if glb_path:
+                    incoming_events.append({"action": "import-glb", "path": glb_path})
+                else:
+                    print("[Spectacles] AI Generation Failed.")
+                    
+            try:
+                import tripo_api
+                tripo_api.run_tripo_pipeline_async(key, img_path, on_ai_done)
+            except Exception as e:
+                print("[Spectacles] AI Error:", e)
+            continue
+
+        # ── Import GLB (Callback from AI) ─────────────────────────────────────
+        if action == "import-glb":
+            glb_path = pt.get("path")
+            if not glb_path or not os.path.exists(glb_path): continue
+            
+            print(f"[Spectacles] Importing AI Model: {glb_path}")
+            bpy.ops.import_scene.gltf(filepath=glb_path)
+            
+            imported = bpy.context.selected_objects
+            if imported:
+                # hide all sketches
+                for cid, entry in curve_registry.items():
+                    entry["obj"].hide_viewport = True
+                    
+                root = imported[0]
+                for ob in imported:
+                    if ob.parent is None:
+                        root = ob
+                        break
+                root.location = (0, 0, 0)
+                sc_factor = 3.0 * bpy.context.scene.spectacles_scale
+                root.scale = (sc_factor, sc_factor, sc_factor)
+                
+                print("[Spectacles] AI Model imported! Sketch hidden.")
             continue
 
         # ── Grab Start ────────────────────────────────────────────────────────
@@ -480,6 +595,10 @@ class SPECTACLES_PT_panel(bpy.types.Panel):
             for uid, col in user_colors.items():
                 box4.label(text=f"  {uid}  ● {col}")
 
+        # ── AI Generation ───────────────────────────────────────────────────
+        box5 = layout.box()
+        box5.label(text="AI Generation", icon='OUTLINER_OB_LIGHT')
+        box5.prop(sc, "spectacles_tripo_key")
 
 # ─── Registration ─────────────────────────────────────────────────────────────
 classes = (
@@ -498,6 +617,8 @@ def register():
         name="URL", description="Supabase Project URL (https://...)", default="")
     bpy.types.Scene.spectacles_token = bpy.props.StringProperty(
         name="Token", description="Supabase Public Token (Anon Key)", default="")
+    bpy.types.Scene.spectacles_tripo_key = bpy.props.StringProperty(
+        name="Tripo API Key", description="API Key for Tripo3D Generative AI", default="")
     bpy.types.Scene.spectacles_channel = bpy.props.StringProperty(
         name="Channel", description="Realtime channel name", default="spatial-drawer")
     bpy.types.Scene.spectacles_scale = bpy.props.FloatProperty(
@@ -525,7 +646,7 @@ def unregister():
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)
     props = [
-        "spectacles_url", "spectacles_token", "spectacles_channel",
+        "spectacles_url", "spectacles_token", "spectacles_channel", "spectacles_tripo_key",
         "spectacles_scale", "spectacles_thickness", "spectacles_dynamic_thickness",
         "spectacles_color", "spectacles_mirror_x", "spectacles_smooth",
     ]

@@ -11,6 +11,8 @@
 // @input SceneObject btnRibbon {"hint": "Button visual for Ribbon brush"}
 // @input SceneObject btnPoly {"hint": "Button visual for Polyline brush"}
 // @input SceneObject btnEraser {"hint": "Button visual for Eraser"}
+// @input SceneObject btnExport {"hint": "Button visual for Export"}
+// @input SceneObject btnAIGen {"hint": "Button visual for AI Generate"}
 // @input SceneObject btnSetOrigin {"hint": "Button visual for Set Origin"}
 // @input SceneObject btnUndo {"hint": "Button visual for Undo"}
 // @input SceneObject btnColors {"hint": "Button visual for Colors (parent)"}
@@ -114,6 +116,8 @@ function buildRadialMenu() {
     var bRibbon  = radialMenu.addButton(getOrCreateButton(script.btnRibbon, "ribbon"),    "ribbon");
     var bPoly    = radialMenu.addButton(getOrCreateButton(script.btnPoly, "poly"),      "poly");
     var bEraser  = radialMenu.addButton(getOrCreateButton(script.btnEraser, "eraser"),    "eraser");
+    var bExport  = radialMenu.addButton(getOrCreateButton(script.btnExport, "export"),    "export");
+    var bAIGen   = radialMenu.addButton(getOrCreateButton(script.btnAIGen, "aigen"),      "aigen");
     var bColors  = radialMenu.addButton(getOrCreateButton(script.btnColors, "colors"),    "colors");
     var bOrigin  = radialMenu.addButton(getOrCreateButton(script.btnSetOrigin, "origin"), "origin");
     var bUndo    = radialMenu.addButton(getOrCreateButton(script.btnUndo, "undo"),      "undo");
@@ -146,6 +150,18 @@ function buildRadialMenu() {
         brushMode = "eraser";
         polylineActive = false;
         print("[SpatialDrawer] Brush → ERASER");
+    });
+
+    bExport.onPress.add(function() {
+        var pos = leftHand.isTracked() ? leftHand.indexTip.position : rightHand.indexTip.position;
+        send("export", pos, null);
+        print("[SpatialDrawer] Action → EXPORT");
+    });
+
+    bAIGen.onPress.add(function() {
+        var pos = leftHand.isTracked() ? leftHand.indexTip.position : rightHand.indexTip.position;
+        send("ai-generate", pos, null);
+        print("[SpatialDrawer] Action → AI GENERATE");
     });
 
     // ── Set Origin callback ────────────────────────────────────────────────
