@@ -69,6 +69,8 @@ def make_material(rgb):
     bsdf = mat.node_tree.nodes.get("Principled BSDF")
     if bsdf:
         bsdf.inputs['Base Color'].default_value = (rgb[0], rgb[1], rgb[2], 1.0)
+    # Ensure color shows up in default "Solid" viewport mode!
+    mat.diffuse_color = (rgb[0], rgb[1], rgb[2], 1.0)
     return mat
 
 def create_curve_object(bx, by, bz, user_id, brush_mode, curve_id):
@@ -79,8 +81,8 @@ def create_curve_object(bx, by, bz, user_id, brush_mode, curve_id):
     cdata.dimensions = '3D'
 
     if brush_mode == "ribbon":
-        cdata.bevel_depth      = sc.spectacles_thickness * 0.35
-        cdata.bevel_resolution = 0   # flat sides (square cross-section)
+        cdata.extrude      = sc.spectacles_thickness * 0.5
+        cdata.bevel_depth  = 0.0
     elif brush_mode == "polyline":
         cdata.bevel_depth = sc.spectacles_thickness * 0.8
     else:

@@ -250,7 +250,12 @@ function onRightPinchDown() {
         }
         lastRightPinchMs = nowMs;
 
-        activeCurveId  = userId + "_" + Date.now();
+        if (brushMode === "polyline" && polylineActive) {
+            // Keep the existing activeCurveId for the ongoing polyline
+        } else {
+            activeCurveId  = userId + "_" + Date.now();
+        }
+        
         pinchHoldTimer = 0;
         isDrawing      = true;
         isGrabbing     = false;
