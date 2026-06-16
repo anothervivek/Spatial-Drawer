@@ -33,13 +33,14 @@ def upload_image(api_key, image_path):
         with urllib.request.urlopen(req) as response:
             res_data = json.loads(response.read().decode('utf-8'))
             if res_data.get("code") == 0:
-                return res_data["data"]["image_token"]
+                return res_data["data"]["image_token"], None
             else:
-                print("[Tripo API] Upload error:", res_data)
-                return None
+                err = str(res_data)
+                print("[Tripo API] Upload error:", err)
+                return None, err
     except Exception as e:
         print("[Tripo API] Upload exception:", e)
-        return None
+        return None, str(e)
 
 def create_task(api_key, image_token):
     url = f"{TRIPO_BASE_URL}/task"
@@ -59,13 +60,14 @@ def create_task(api_key, image_token):
         with urllib.request.urlopen(req) as response:
             res_data = json.loads(response.read().decode('utf-8'))
             if res_data.get("code") == 0:
-                return res_data["data"]["task_id"]
+                return res_data["data"]["task_id"], None
             else:
-                print("[Tripo API] Create task error:", res_data)
-                return None
+                err = str(res_data)
+                print("[Tripo API] Create task error:", err)
+                return None, err
     except Exception as e:
         print("[Tripo API] Create task exception:", e)
-        return None
+        return None, str(e)
 
 def poll_task(api_key, task_id):
     url = f"{TRIPO_BASE_URL}/task/{task_id}"
@@ -81,16 +83,18 @@ def poll_task(api_key, task_id):
                 if res_data.get("code") == 0:
                     status = res_data["data"]["status"]
                     if status == "success":
-                        return res_data["data"]["result"]["model"]["url"]
+                        return res_data["data"]["result"]["model"]["url"], None
                     elif status in ["failed", "cancelled", "timeout"]:
+                        err = f"Task {status}"
                         print("[Tripo API] Task failed:", status)
-                        return None
+                        return None, err
                     else:
                         # running or queued
                         time.sleep(3)
                 else:
-                    print("[Tripo API] Poll error:", res_data)
-                    return None
+                    err = str(res_data)
+                    print("[Tripo API] Poll error:", err)
+                    return None, err
         except Exception as e:
             print("[Tripo API] Poll exception:", e)
             time.sleep(3)
@@ -106,21 +110,21 @@ def download_model(model_url, output_path):
 def run_tripo_pipeline_async(api_key, image_path, callback):
     def worker():
         print("[Tripo API] Uploading sketch...")
-        token = upload_image(api_key, image_path)
+        token, err = upload_image(api_key, image_path)
         if not token:
-            callback(None)
+            callback(None, f"Upload Error: {err}")
             return
         
         print("[Tripo API] Creating AI generation task...")
-        task_id = create_task(api_key, token)
+        task_id, err = create_task(api_key, token)
         if not task_id:
-            callback(None)
+            callback(None, f"Task Error: {err}")
             return
             
         print("[Tripo API] Generating 3D model (this may take 30-60s)...")
-        model_url = poll_task(api_key, task_id)
+        model_url, err = poll_task(api_key, task_id)
         if not model_url:
-            callback(None)
+            callback(None, f"Gen Error: {err}")
             return
             
         print("[Tripo API] Downloading 3D model...")
@@ -128,7 +132,7 @@ def run_tripo_pipeline_async(api_key, image_path, callback):
         download_model(model_url, out_path)
         
         print(f"[Tripo API] Done! Saved to {out_path}")
-        callback(out_path)
+        callback(out_path, None)
 
     t = threading.Thread(target=worker)
     t.daemon = True

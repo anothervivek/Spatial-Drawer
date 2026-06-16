@@ -340,12 +340,12 @@ def process_events():
                 importlib.reload(tripo_api)
                 
                 # Pass the center coordinates so import-glb can position the model correctly
-                def on_ai_done(glb_path):
+                def on_ai_done(glb_path, err=None):
                     if glb_path:
                         incoming_events.append({"action": "import-glb", "path": glb_path, "cx": center_x, "cy": center_y, "cz": center_z})
                     else:
-                        print("[Spectacles] AI Generation Failed.")
-                        bpy.context.scene.spectacles_status_msg = "AI Generation Failed!"
+                        print(f"[Spectacles] AI Generation Failed: {err}")
+                        incoming_events.append({"action": "ai-error", "err": str(err)[:40]})
                 
                 tripo_api.run_tripo_pipeline_async(key, img_path, on_ai_done)
             except Exception as e:
@@ -354,6 +354,11 @@ def process_events():
             continue
 
         # ── Import GLB (Callback from AI) ─────────────────────────────────────
+        if action == "ai-error":
+            err = pt.get("err", "Unknown Error")
+            bpy.context.scene.spectacles_status_msg = f"AI Error: {err}"
+            continue
+
         if action == "import-glb":
             glb_path = pt.get("path")
             if not glb_path or not os.path.exists(glb_path): continue
