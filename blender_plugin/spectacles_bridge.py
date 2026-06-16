@@ -252,7 +252,7 @@ def process_events():
 
         # ── AI Generate ───────────────────────────────────────────────────────
         if action == "ai-generate":
-            key = bpy.context.scene.spectacles_tripo_key
+            key = bpy.context.scene.spectacles_tripo_key.strip()
             if not key:
                 print("[Spectacles] Error: Tripo3D API key missing! Add it in the panel.")
                 bpy.context.scene.spectacles_status_msg = "API Key Missing!"
