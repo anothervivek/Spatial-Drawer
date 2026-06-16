@@ -571,20 +571,28 @@ class SPECTACLES_OT_listen(bpy.types.Operator):
     bl_idname = "spectacles.listen"
     bl_label  = "Start Listening"
     def execute(self, context):
-        global is_listening, ws_thread
-        if not is_listening:
-            if not HAS_WEBSOCKETS:
-                self.report({'ERROR'}, "Install WebSocket Library first!"); return {'CANCELLED'}
-            if not context.scene.spectacles_url or not context.scene.spectacles_token:
-                self.report({'ERROR'}, "Enter URL and Token first!"); return {'CANCELLED'}
-            
-            is_listening = True
-            ws_thread = threading.Thread(target=connect_websocket)
-            ws_thread.daemon = True
-            ws_thread.start()
-            if not bpy.app.timers.is_registered(process_events):
-                bpy.app.timers.register(process_events)
-            self.report({'INFO'}, "Listening started...")
+        global is_listening, ws_thread, user_colors, curve_registry, active_strokes, drawn_stack, incoming_events
+        if is_listening:
+            self.report({'WARNING'}, "Already listening!")
+            return {'CANCELLED'}
+        if not HAS_WEBSOCKETS:
+            self.report({'ERROR'}, "Install WebSocket Library first!"); return {'CANCELLED'}
+        if not context.scene.spectacles_url or not context.scene.spectacles_token:
+            self.report({'ERROR'}, "Enter URL and Token first!"); return {'CANCELLED'}
+        
+        curve_registry.clear()
+        active_strokes.clear()
+        user_colors.clear()
+        drawn_stack.clear()
+        incoming_events.clear()
+        
+        is_listening = True
+        ws_thread = threading.Thread(target=connect_websocket)
+        ws_thread.daemon = True
+        ws_thread.start()
+        if not bpy.app.timers.is_registered(process_events):
+            bpy.app.timers.register(process_events)
+        self.report({'INFO'}, "Listening started...")
         return {'FINISHED'}
 
 class SPECTACLES_OT_stop(bpy.types.Operator):
@@ -604,6 +612,17 @@ class SPECTACLES_OT_undo(bpy.types.Operator):
     bl_label  = "Undo Last Stroke"
     def execute(self, context):
         incoming_events.append({"action": "undo"})
+        return {'FINISHED'}
+
+class SPECTACLES_OT_clear_users(bpy.types.Operator):
+    """Clear the list of online users"""
+    bl_idname = "spectacles.clear_users"
+    bl_label = "Clear Offline Users"
+    
+    def execute(self, context):
+        global user_colors
+        user_colors.clear()
+        self.report({'INFO'}, "Cleared users list")
         return {'FINISHED'}
 
 
@@ -663,6 +682,7 @@ class SPECTACLES_PT_panel(bpy.types.Panel):
             box4.label(text=f"Users Online: {len(user_colors)}", icon='COMMUNITY')
             for uid, col in user_colors.items():
                 box4.label(text=f"  {uid}  ● {col}")
+            box4.operator("spectacles.clear_users", icon='X')
 
         # ── AI Generation ───────────────────────────────────────────────────
         box5 = layout.box()
@@ -679,6 +699,7 @@ classes = (
     SPECTACLES_OT_listen,
     SPECTACLES_OT_stop,
     SPECTACLES_OT_undo,
+    SPECTACLES_OT_clear_users,
     SPECTACLES_PT_panel,
 )
 
