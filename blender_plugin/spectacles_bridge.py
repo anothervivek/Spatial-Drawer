@@ -242,8 +242,10 @@ def process_events():
                     embed_textures=True
                 )
                 print(f"[Spectacles] Exported successfully to {filepath}")
+                bpy.context.scene.spectacles_status_msg = f"Saved to Desktop: {filename}"
             except Exception as e:
                 print(f"[Spectacles] Export failed: {e}")
+                bpy.context.scene.spectacles_status_msg = "Export Failed!"
                 
             bpy.ops.object.delete()
             continue
@@ -253,16 +255,37 @@ def process_events():
             key = bpy.context.scene.spectacles_tripo_key
             if not key:
                 print("[Spectacles] Error: Tripo3D API key missing! Add it in the panel.")
+                bpy.context.scene.spectacles_status_msg = "API Key Missing!"
                 continue
             
             if not curve_registry:
                 print("[Spectacles] Error: Nothing to generate from!")
+                bpy.context.scene.spectacles_status_msg = "Nothing to generate!"
                 continue
 
+            bpy.context.scene.spectacles_status_msg = "Generating AI Model..."
             print("[Spectacles] Capturing sketch for AI...")
             sc = bpy.context.scene
             orig_engine = sc.render.engine
             sc.render.engine = 'BLENDER_WORKBENCH'
+            
+            # Calculate Center and Bounding Box
+            min_x = min_y = min_z = float('inf')
+            max_x = max_y = max_z = float('-inf')
+            for cid, entry in curve_registry.items():
+                loc = entry["obj"].location
+                min_x = min(min_x, loc.x)
+                min_y = min(min_y, loc.y)
+                min_z = min(min_z, loc.z)
+                max_x = max(max_x, loc.x)
+                max_y = max(max_y, loc.y)
+                max_z = max(max_z, loc.z)
+            
+            center_x = (min_x + max_x) / 2.0
+            center_y = (min_y + max_y) / 2.0
+            center_z = (min_z + max_z) / 2.0
+            
+            max_dim = max(max_x - min_x, max_y - min_y, max_z - min_z, 10.0)
             
             cam = sc.camera
             if not cam:
@@ -270,9 +293,11 @@ def process_events():
                 cam = bpy.data.objects.new("AICam", cam_data)
                 bpy.context.collection.objects.link(cam)
                 sc.camera = cam
-                cam.location = (0, -10, 5)
-                cam.rotation_euler = (math.radians(60), 0, 0)
-                
+            
+            # Auto-frame camera to point exactly at the drawing
+            cam.location = (center_x, center_y - (max_dim * 1.5), center_z)
+            cam.rotation_euler = (math.radians(90), 0, 0)
+            
             import tempfile
             img_path = os.path.join(tempfile.gettempdir(), "spectacles_sketch.png")
             sc.render.resolution_x = 512
@@ -291,9 +316,18 @@ def process_events():
                     
             try:
                 import tripo_api
+                # Pass the center coordinates so import-glb can position the model correctly
+                def on_ai_done(glb_path):
+                    if glb_path:
+                        incoming_events.append({"action": "import-glb", "path": glb_path, "cx": center_x, "cy": center_y, "cz": center_z})
+                    else:
+                        print("[Spectacles] AI Generation Failed.")
+                        bpy.context.scene.spectacles_status_msg = "AI Generation Failed!"
+                
                 tripo_api.run_tripo_pipeline_async(key, img_path, on_ai_done)
             except Exception as e:
                 print("[Spectacles] AI Error:", e)
+                bpy.context.scene.spectacles_status_msg = "AI Error Occurred!"
             continue
 
         # ── Import GLB (Callback from AI) ─────────────────────────────────────
@@ -315,10 +349,17 @@ def process_events():
                     if ob.parent is None:
                         root = ob
                         break
-                root.location = (0, 0, 0)
-                sc_factor = 3.0 * bpy.context.scene.spectacles_scale
+                        
+                cx = pt.get("cx", 0)
+                cy = pt.get("cy", 0)
+                cz = pt.get("cz", 0)
+                root.location = (cx, cy, cz)
+                
+                # Fix oversized scale
+                sc_factor = bpy.context.scene.spectacles_scale * 0.1
                 root.scale = (sc_factor, sc_factor, sc_factor)
                 
+                bpy.context.scene.spectacles_status_msg = "AI Generation Complete!"
                 print("[Spectacles] AI Model imported! Sketch hidden.")
             continue
 
@@ -600,6 +641,10 @@ class SPECTACLES_PT_panel(bpy.types.Panel):
         box5.label(text="AI Generation", icon='OUTLINER_OB_LIGHT')
         box5.prop(sc, "spectacles_tripo_key")
 
+        if sc.spectacles_status_msg:
+            layout.separator()
+            layout.label(text=sc.spectacles_status_msg, icon='INFO')
+
 # ─── Registration ─────────────────────────────────────────────────────────────
 classes = (
     SPECTACLES_OT_install_deps,
@@ -638,6 +683,7 @@ def register():
         name="Mirror X", description="Mirror strokes across the X axis", default=False)
     bpy.types.Scene.spectacles_smooth = bpy.props.BoolProperty(
         name="Auto-Smooth", description="Apply Subdivision modifier to curves", default=True)
+    bpy.types.Scene.spectacles_status_msg = bpy.props.StringProperty(default="")
 
 def unregister():
     global is_listening, ws_app
