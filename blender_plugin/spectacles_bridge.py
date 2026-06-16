@@ -269,23 +269,38 @@ def process_events():
             orig_engine = sc.render.engine
             sc.render.engine = 'BLENDER_WORKBENCH'
             
-            # Calculate Center and Bounding Box
+            # Calculate Bounding Box of all curve points accurately
             min_x = min_y = min_z = float('inf')
             max_x = max_y = max_z = float('-inf')
-            for cid, entry in curve_registry.items():
-                loc = entry["obj"].location
-                min_x = min(min_x, loc.x)
-                min_y = min(min_y, loc.y)
-                min_z = min(min_z, loc.z)
-                max_x = max(max_x, loc.x)
-                max_y = max(max_y, loc.y)
-                max_z = max(max_z, loc.z)
+            valid_points = False
             
+            for cid, entry in curve_registry.items():
+                obj = entry["obj"]
+                mat = obj.matrix_world
+                if obj.type == 'CURVE':
+                    for spline in obj.data.splines:
+                        pts = spline.bezier_points if spline.type == 'BEZIER' else spline.points
+                        for p in pts:
+                            co = mat @ p.co.xyz
+                            min_x = min(min_x, co.x)
+                            min_y = min(min_y, co.y)
+                            min_z = min(min_z, co.z)
+                            max_x = max(max_x, co.x)
+                            max_y = max(max_y, co.y)
+                            max_z = max(max_z, co.z)
+                            valid_points = True
+            
+            if not valid_points:
+                print("[Spectacles] No valid points found for AI!")
+                bpy.context.scene.spectacles_status_msg = "Nothing to generate!"
+                continue
+
             center_x = (min_x + max_x) / 2.0
             center_y = (min_y + max_y) / 2.0
             center_z = (min_z + max_z) / 2.0
             
-            max_dim = max(max_x - min_x, max_y - min_y, max_z - min_z, 10.0)
+            max_dim = max(max_x - min_x, max_y - min_y, max_z - min_z)
+            if max_dim < 0.1: max_dim = 10.0
             
             cam = sc.camera
             if not cam:
