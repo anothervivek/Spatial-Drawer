@@ -315,7 +315,15 @@ def process_events():
                     print("[Spectacles] AI Generation Failed.")
                     
             try:
+                import sys
+                plugin_dir = "/Users/viveksingh/Downloads/Specs/Specs-Projects/Spatial Drawer/blender_plugin"
+                if plugin_dir not in sys.path:
+                    sys.path.append(plugin_dir)
+                
                 import tripo_api
+                import importlib
+                importlib.reload(tripo_api)
+                
                 # Pass the center coordinates so import-glb can position the model correctly
                 def on_ai_done(glb_path):
                     if glb_path:
