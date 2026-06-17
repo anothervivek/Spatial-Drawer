@@ -277,7 +277,7 @@
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: 0.000000, z: 0.000000}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 7.000000, y: 7.000000, z: 7.000000}
+    Scale: {x: 6.500000, y: 6.500000, z: 6.500000}
     HasSegmentScaleCompensation: false
   Children:
     []
@@ -366,7 +366,7 @@
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: 0.000000, z: -0.000061}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 7.000000, y: 7.000000, z: 7.000000}
+    Scale: {x: 6.000000, y: 6.000000, z: 6.000000}
     HasSegmentScaleCompensation: false
   Children:
     []
@@ -1064,7 +1064,7 @@
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: 0.000000, z: -0.000061}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 7.000000, y: 7.000000, z: 7.000000}
+    Scale: {x: 6.000000, y: 6.000000, z: 6.000000}
     HasSegmentScaleCompensation: false
   Children:
     []
@@ -1246,7 +1246,7 @@
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: 0.000000, z: 0.000000}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 7.000000, y: 7.000000, z: 7.000000}
+    Scale: {x: 6.500000, y: 6.500000, z: 6.500000}
     HasSegmentScaleCompensation: false
   Children:
     []
@@ -1360,7 +1360,7 @@
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: 0.000000, z: -0.000061}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 7.000000, y: 7.000000, z: 7.000000}
+    Scale: {x: 6.000000, y: 6.000000, z: 6.000000}
     HasSegmentScaleCompensation: false
   Children:
     []
@@ -1468,7 +1468,7 @@
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: 0.000000, z: 0.000000}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 7.000000, y: 7.000000, z: 7.000000}
+    Scale: {x: 6.500000, y: 6.500000, z: 6.500000}
     HasSegmentScaleCompensation: false
   Children:
     []
@@ -1727,7 +1727,7 @@
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: 0.000000, z: 0.000000}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 7.000000, y: 7.000000, z: 7.000000}
+    Scale: {x: 6.500000, y: 6.500000, z: 6.500000}
     HasSegmentScaleCompensation: false
   Children:
     []
@@ -2101,7 +2101,7 @@
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: 0.000000, z: 0.000000}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 7.000000, y: 7.000000, z: 7.000000}
+    Scale: {x: 6.500000, y: 6.500000, z: 6.500000}
     HasSegmentScaleCompensation: false
   Children:
     []
@@ -2949,7 +2949,7 @@
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: 0.000000, z: 0.000000}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 7.000000, y: 7.000000, z: 7.000000}
+    Scale: {x: 6.500000, y: 6.500000, z: 6.500000}
     HasSegmentScaleCompensation: false
   Children:
     []
@@ -3390,7 +3390,7 @@
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: 0.000000, z: 0.000000}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 7.000000, y: 7.000000, z: 7.000000}
+    Scale: {x: 6.500000, y: 6.500000, z: 6.500000}
     HasSegmentScaleCompensation: false
   Children:
     []
@@ -3451,7 +3451,7 @@
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: 0.000000, z: -0.000061}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 7.000000, y: 7.000000, z: 7.000000}
+    Scale: {x: 6.000000, y: 6.000000, z: 6.000000}
     HasSegmentScaleCompensation: false
   Children:
     []
@@ -3496,7 +3496,7 @@
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: 0.000000, z: 0.000000}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 7.000000, y: 7.000000, z: 7.000000}
+    Scale: {x: 6.500000, y: 6.500000, z: 6.500000}
     HasSegmentScaleCompensation: false
   Children:
     []
@@ -3564,7 +3564,7 @@
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: 0.000000, z: -0.000061}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 7.000000, y: 7.000000, z: 7.000000}
+    Scale: {x: 6.000000, y: 6.000000, z: 6.000000}
     HasSegmentScaleCompensation: false
   Children:
     []
@@ -3858,7 +3858,7 @@
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: 0.000000, z: 0.000000}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 7.000000, y: 7.000000, z: 7.000000}
+    Scale: {x: 6.500000, y: 6.500000, z: 6.500000}
     HasSegmentScaleCompensation: false
   Children:
     []
@@ -3873,7 +3873,7 @@
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: 0.000000, z: -0.000061}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 7.000000, y: 7.000000, z: 7.000000}
+    Scale: {x: 6.000000, y: 6.000000, z: 6.000000}
     HasSegmentScaleCompensation: false
   Children:
     []
@@ -4581,7 +4581,7 @@
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: 0.000000, z: 0.000000}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 7.000000, y: 7.000000, z: 7.000000}
+    Scale: {x: 6.500000, y: 6.500000, z: 6.500000}
     HasSegmentScaleCompensation: false
   Children:
     []
@@ -4655,7 +4655,7 @@
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: 0.000000, z: -0.000061}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 7.000000, y: 7.000000, z: 7.000000}
+    Scale: {x: 6.000000, y: 6.000000, z: 6.000000}
     HasSegmentScaleCompensation: false
   Children:
     []
@@ -4792,7 +4792,7 @@
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: 0.000000, z: 0.000000}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 7.000000, y: 7.000000, z: 7.000000}
+    Scale: {x: 6.500000, y: 6.500000, z: 6.500000}
     HasSegmentScaleCompensation: false
   Children:
     []
@@ -4837,7 +4837,7 @@
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: 0.000000, z: -0.000061}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 7.000000, y: 7.000000, z: 7.000000}
+    Scale: {x: 6.000000, y: 6.000000, z: 6.000000}
     HasSegmentScaleCompensation: false
   Children:
     []
@@ -5110,7 +5110,7 @@
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: 0.000000, z: 0.000000}
     Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 7.000000, y: 7.000000, z: 7.000000}
+    Scale: {x: 6.500000, y: 6.500000, z: 6.500000}
     HasSegmentScaleCompensation: false
   Children:
     []

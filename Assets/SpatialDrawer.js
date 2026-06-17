@@ -96,6 +96,7 @@ var currentBuilder = null;
 var currentTrailPoints = [];
 var previewTrails = []; // Store them to clear on undo
 var centerTextRef = null; // Shared reference for radial center text
+var grabHandlesRoot = null;
 
 // ── Grab Handle: lazily attach SIK Interactable+Manipulation to a trail ──────
 function attachGrabHandle(trail) {
@@ -105,8 +106,9 @@ function attachGrabHandle(trail) {
     var tempRoot = global.scene.createSceneObject("_grabTemp");
     var grabHandle = script.originGizmo.copyWholeHierarchy(tempRoot);
     
-    // Un-parent from temp root and destroy temp
-    grabHandle.setParent(null);
+    // Un-parent from temp root and move to a dedicated grab handles root
+    if (!grabHandlesRoot) grabHandlesRoot = global.scene.createSceneObject("GrabHandlesRoot");
+    grabHandle.setParent(grabHandlesRoot);
     tempRoot.destroy();
     
     grabHandle.name = "GrabHandle_" + (trail.name || "trail");
@@ -121,6 +123,23 @@ function attachGrabHandle(trail) {
     var anchor = trail.anchorPos || vec3.zero();
     grabHandle.getTransform().setWorldPosition(anchor);
     grabHandle.getTransform().setLocalScale(vec3.one());
+    
+    // Force a valid BoxShape collider (30cm) so it's always grabbable
+    var colliders = grabHandle.getComponents("Physics.ColliderComponent");
+    for (var c = 0; c < colliders.length; c++) {
+        var shape = Shape.createBoxShape();
+        shape.size = new vec3(30, 30, 30);
+        colliders[c].shape = shape;
+        colliders[c].fitVisual = false;
+    }
+    
+    // Ensure the manipulation script moves THIS handle, not the original gizmo
+    var scripts = grabHandle.getComponents("Component.ScriptComponent");
+    for (var s = 0; s < scripts.length; s++) {
+        if (scripts[s].setManipulateRoot !== undefined) {
+            scripts[s].setManipulateRoot(grabHandle.getTransform());
+        }
+    }
     
     // Parent trail under grab handle so moving the handle moves the mesh
     trail.setParent(grabHandle);
@@ -157,10 +176,7 @@ function updateGrabColliders(enabled) {
         
         var handle = trail.grabHandle;
         if (handle && !handle.isDestroyed) {
-            var scripts = handle.getComponents("Component.ScriptComponent");
-            for (var s = 0; s < scripts.length; s++) {
-                scripts[s].enabled = enabled;
-            }
+            // Only toggle the colliders; toggling SIK scripts breaks their internal state
             var colliders = handle.getComponents("Physics.ColliderComponent");
             for (var c = 0; c < colliders.length; c++) {
                 colliders[c].enabled = enabled;
