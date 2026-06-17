@@ -97,10 +97,63 @@ var currentTrailPoints = [];
 var previewTrails = []; // Store them to clear on undo
 var centerTextRef = null; // Shared reference for radial center text
 
+// ── Grab Handle: lazily attach SIK Interactable+Manipulation to a trail ──────
+function attachGrabHandle(trail) {
+    if (!script.originGizmo || !trail || trail.isDestroyed || trail.grabHandle) return;
+    
+    // Create a temporary root so copyWholeHierarchy always has a valid parent
+    var tempRoot = global.scene.createSceneObject("_grabTemp");
+    var grabHandle = script.originGizmo.copyWholeHierarchy(tempRoot);
+    
+    // Un-parent from temp root and destroy temp
+    grabHandle.setParent(null);
+    tempRoot.destroy();
+    
+    grabHandle.name = "GrabHandle_" + (trail.name || "trail");
+    grabHandle.enabled = true;
+    
+    // Remove visual children — we only want the SIK scripts + collider
+    while (grabHandle.getChildrenCount() > 0) grabHandle.getChild(0).destroy();
+    var oldVis = grabHandle.getComponents("Component.RenderMeshVisual");
+    for (var v = 0; v < oldVis.length; v++) oldVis[v].destroy();
+    
+    // Position at the trail's anchor (first drawn point)
+    var anchor = trail.anchorPos || vec3.zero();
+    grabHandle.getTransform().setWorldPosition(anchor);
+    grabHandle.getTransform().setLocalScale(vec3.one());
+    
+    // Parent trail under grab handle so moving the handle moves the mesh
+    trail.setParent(grabHandle);
+    // Preserve trail world transform so vertices stay in place
+    trail.getTransform().setWorldPosition(vec3.zero());
+    trail.getTransform().setWorldRotation(quat.quatIdentity());
+    trail.getTransform().setWorldScale(vec3.one());
+    
+    trail.grabHandle = grabHandle;
+    print("[SpatialDrawer] Attached grab handle to " + trail.name);
+}
+
+// ── Destroy a trail and its grab handle cleanly ──────────────────────────────
+function destroyTrail(trail) {
+    if (!trail || trail.isDestroyed) return;
+    var handle = trail.grabHandle;
+    if (handle && !handle.isDestroyed) {
+        // Un-parent trail first so it can be destroyed independently
+        trail.setParent(null);
+        handle.destroy();
+    }
+    trail.destroy();
+}
+
 function updateGrabColliders(enabled) {
     for (var i = 0; i < previewTrails.length; i++) {
         var trail = previewTrails[i];
         if (!trail || trail.isDestroyed) continue;
+        
+        // Lazily create grab handle when entering grab mode
+        if (enabled && !trail.grabHandle) {
+            attachGrabHandle(trail);
+        }
         
         var handle = trail.grabHandle;
         if (handle && !handle.isDestroyed) {
@@ -324,7 +377,7 @@ function buildRadialMenu() {
         send("undo", getMenuHand().indexTip.position, null);
         if (previewTrails.length > 0) {
             var lastTrail = previewTrails.pop();
-            lastTrail.destroy();
+            destroyTrail(lastTrail);
         }
         print("[SpatialDrawer] UNDO");
     });
@@ -680,7 +733,7 @@ function onUpdate() {
                     var trail = previewTrails[i];
                     if (trail && !trail.isDestroyed && trail.anchorPos) {
                         if (trail.anchorPos.distance(erasePos) < eraseDist) {
-                            trail.destroy();
+                            destroyTrail(trail);
                             previewTrails.splice(i, 1);
                         }
                     }

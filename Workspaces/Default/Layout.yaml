@@ -26,10 +26,8 @@ dock:
                 Uuid: df91b2cf-37e1-401c-83fc-3d9f83343e71
               - persistentName: Snap.Plugin.Gui.Graph.Editor
                 Uuid: 1337b227-d9b9-497e-92e3-f85d2b23a938
-              - persistentName: Snap.Plugin.Gui.ScriptEditor
-                Uuid: 14b14327-d383-4537-93e2-51dbbcff0631
             type: section
-            current: 0
+            current: 2
           - items:
               - persistentName: Snap.Plugin.Gui.LoggerPanel
                 Uuid: 81de965d-0c94-4d28-82cf-901740003a1f

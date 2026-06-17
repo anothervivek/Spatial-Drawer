@@ -1,7 +1,7 @@
 CollapsedEntities:
   type: stringset
   value:
-    size: 677
+    size: 686
     values:
       - Advanced Grid.lspkg
       - Advanced Grid.lspkg/Advanced_Grid__PLACE_IN_SCENE.prefab
@@ -14,6 +14,7 @@ CollapsedEntities:
       - Advanced Grid.lspkg/package.native
       - Base.png
       - Color Picker Wheel.lsc
+      - Color.png
       - Empty.ss_graph
       - Iconss/brush.png
       - Iconss/color.png
@@ -39,7 +40,15 @@ CollapsedEntities:
       - Image 10.mat
       - Image 11.mat
       - Image 12.mat
+      - Image 13.mat
+      - Image 14.mat
+      - Image 15.mat
+      - Image 16.mat
+      - Image 17.mat
+      - Image 18.mat
+      - Image 19.mat
       - Image 2.mat
+      - Image 20.mat
       - Image 3.mat
       - Image 4.mat
       - Image 5.mat
