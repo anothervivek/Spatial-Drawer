@@ -1,17 +1,14 @@
 CollapsedEntities:
   type: stringset
   value:
-    size: 52
+    size: 44
     values:
       - 0005641c-028d-459a-0000-000000014b4d
       - 03a62039-0f32-4da7-b397-8e9f60095f02
-      - 05cdae48-44a8-438a-9181-5abe381d238e
       - 08295463-4ac4-4975-a38a-d905c39e2beb
       - 0a2ceecd-c532-43d7-83db-6cfd009c7e79
       - 27972a4a-a515-44a2-8609-a6c561a5d37f
-      - 2b7ecb20-de6c-4682-8a39-61e2e5e70078
       - 2c007e95-064a-4fcb-81f4-8383fbc06094
-      - 2f32466d-1a97-4f99-9ce2-7505c3ba8aa3
       - 314b226a-d96e-498c-ad3b-eade6a4f8025
       - 3456eca9-5cdc-42e0-808b-4a85c757e271
       - 37b50391-8cdd-4575-8b6c-8936e8bf0264
@@ -21,12 +18,10 @@ CollapsedEntities:
       - 5a5ed49d-eae7-4bc0-b5fb-f6714bbbc461
       - 5aa0f98b-e799-448c-a2dc-cae5d04fa2a4
       - 67fee38b-8258-49ce-9d5b-3250cf29a457
-      - 6c4f4e1c-f371-4f63-8214-47efe5ebdab2
       - 6f0793e8-d8dc-44ca-ba76-d2ccd7bd77e3
       - 7b9dfe62-758d-4b65-9bbc-c0398a87bf61
       - 82e6c259-e161-4ddc-97bc-7a8a87644103
       - 881a0649-678e-434b-bf03-f4e2ab4e6c2e
-      - 8e016ba4-6772-403d-9a09-03b779cc7eaa
       - 920d89af-8d9a-44c9-acf6-207832db10a0
       - a8870504-96a4-4bc4-8703-178ff2749145
       - ad310898-6757-47ea-9e8e-9eb23e7e84c1
@@ -40,17 +35,14 @@ CollapsedEntities:
       - c2d6ae44-b317-406c-82cf-ff7c10ab6be1
       - cb723e33-4a15-4f02-82d2-7e80299b1395
       - d5cbb7eb-4630-44fe-ada3-97641ffa7dea
-      - ddda197c-54dd-4087-9d64-d501762a5bfd
       - e1a1743b-e8d5-46c3-bcb7-72b3d2865690
       - e3bc4b75-0d47-4852-a0b4-6f06ad69b5e5
-      - e58750f2-250b-43bd-9470-894cefe07ee3
       - e5a74944-2b62-451e-8658-6f2ed98f9025
       - e5d4a962-e2ae-49de-97c1-c1a58b3b8dba
       - e9cd99de-42be-4da5-8435-344abb82635a
       - eb95a031-9963-4377-aaf2-b034f8cf2357
       - eccc5e9d-cd6b-4b18-932a-c4db8df81c45
       - f1a75a29-53b3-4f18-a060-ce3465463aec
-      - f54fb33d-8612-4072-a999-0055a59b7f6b
       - f741230a-b813-422b-a1ea-ad590b1429b6
       - f867f85e-67d8-4085-b75c-7e392986a61d
       - feb404ff-e5c6-4f0f-840b-cb91f8b5c03f

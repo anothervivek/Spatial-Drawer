@@ -312,6 +312,7 @@ function buildRadialMenu() {
         brushMode = "grab";
         bezierActiveCurveId = null;
         updateGrabColliders(true);
+        setRadioButtonState(brushButtons, script.btnGrab);
         print("[SpatialDrawer] Brush → GRAB");
     });
 
@@ -319,6 +320,7 @@ function buildRadialMenu() {
         brushMode      = "tube";
         bezierActiveCurveId = null;
         updateGrabColliders(false);
+        setRadioButtonState(brushButtons, script.btnTube);
         print("[SpatialDrawer] Brush → TUBE");
     });
 
@@ -326,12 +328,14 @@ function buildRadialMenu() {
         brushMode      = "ribbon";
         bezierActiveCurveId = null;
         updateGrabColliders(false);
+        setRadioButtonState(brushButtons, script.btnRibbon);
         print("[SpatialDrawer] Brush → RIBBON");
     });
 
     bPoly.onPress.add(function() {
         brushMode = "polyline";
         updateGrabColliders(false);
+        setRadioButtonState(brushButtons, script.btnPoly);
         print("[SpatialDrawer] Brush → POLYLINE");
     });
 
@@ -339,6 +343,7 @@ function buildRadialMenu() {
         brushMode      = "eraser";
         bezierActiveCurveId = null;
         updateGrabColliders(false);
+        setRadioButtonState(brushButtons, script.btnEraser);
         print("[SpatialDrawer] Brush → ERASER");
     });
 
@@ -360,6 +365,7 @@ function buildRadialMenu() {
 
     bHand.onPress.add(function() {
         isLeftHanded = !isLeftHanded;
+        setRadioButtonState([script.btnHandedness], isLeftHanded ? script.btnHandedness : null);
         print("[SpatialDrawer] Drawing Hand: " + (isLeftHanded ? "LEFT" : "RIGHT"));
     });
 
@@ -396,6 +402,7 @@ function buildRadialMenu() {
                         payload.b = cv.b;
                     }
                     send("set-color", leftHand.indexTip.position, payload);
+                    setRadioButtonState(internalColorPalette, internalColorPalette[colorIdx]);
                     print("[SpatialDrawer] Color → " + colorIdx);
                 });
             }
@@ -442,6 +449,13 @@ function buildRadialMenu() {
         if (centerTextRef) centerTextRef.text = defaultCenterLabel;
     });
 
+    // ── Initialize default button states ────────────────────────────────────
+    setRadioButtonState(brushButtons, script.btnTube);
+    setRadioButtonState([script.btnHandedness], isLeftHanded ? script.btnHandedness : null);
+    if (internalColorPalette.length > 0) {
+        setRadioButtonState(internalColorPalette, internalColorPalette[0]); // Default to first color
+    }
+
     print("[SpatialDrawer] ✅ Radial Menu ready! centerTextRef=" + (centerTextRef ? "OK" : "NULL"))
 }
 
@@ -452,6 +466,8 @@ function onDrawHandPinchDown() {
     try {
         var drawHand = getDrawHand();
         if (!drawHand.isTracked()) return;
+        
+        if (brushMode === "grab") return; // SIK handles grabbing
 
         var pos = drawHand.indexTip.position;
         var nowMs = getTime() * 1000;

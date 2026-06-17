@@ -353,7 +353,7 @@
         []
       onFinishedCallbacks:
         []
-      _width: !<float> 12.000000
+      _width: !<float> 10.000000
   ScriptTypes:
     "":
       {}
@@ -1110,7 +1110,7 @@
         []
       onFinishedCallbacks:
         []
-      _width: !<float> 12.000000
+      _width: !<float> 10.000000
   ScriptTypes:
     "":
       {}
@@ -1154,7 +1154,7 @@
         []
       onFinishedCallbacks:
         []
-      _width: !<float> 12.000000
+      _width: !<float> 10.000000
   ScriptTypes:
     "":
       {}
@@ -1847,7 +1847,7 @@
         []
       onFinishedCallbacks:
         []
-      _width: !<float> 12.000000
+      _width: !<float> 10.000000
   ScriptTypes:
     "":
       {}
@@ -1906,7 +1906,7 @@
         []
       onFinishedCallbacks:
         []
-      _width: !<float> 12.000000
+      _width: !<float> 10.000000
   ScriptTypes:
     "":
       {}
@@ -3309,7 +3309,7 @@
         []
       onFinishedCallbacks:
         []
-      _width: !<float> 12.000000
+      _width: !<float> 10.000000
   ScriptTypes:
     "":
       {}
@@ -3610,7 +3610,7 @@
         []
       onFinishedCallbacks:
         []
-      _width: !<float> 12.000000
+      _width: !<float> 10.000000
   ScriptTypes:
     "":
       {}
@@ -4642,7 +4642,7 @@
         []
       onFinishedCallbacks:
         []
-      _width: !<float> 12.000000
+      _width: !<float> 10.000000
   ScriptTypes:
     "":
       {}

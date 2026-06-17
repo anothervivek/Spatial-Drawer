@@ -1,37 +1,19 @@
 CollapsedEntities:
   type: stringset
   value:
-    size: 686
+    size: 662
     values:
-      - Advanced Grid.lspkg
-      - Advanced Grid.lspkg/Advanced_Grid__PLACE_IN_SCENE.prefab
-      - Advanced Grid.lspkg/Materials
-      - "Advanced Grid.lspkg/Materials/Advanced_Grid[EDIT ME].mat"
-      - Advanced Grid.lspkg/Shaders
-      - "Advanced Grid.lspkg/Shaders/Advanced_Grid[EDIT ME].ss_graph"
-      - Advanced Grid.lspkg/Textures
-      - Advanced Grid.lspkg/Textures/line_grey.png
-      - Advanced Grid.lspkg/package.native
       - Base.png
       - Color Picker Wheel.lsc
       - Color.png
       - Empty.ss_graph
       - Iconss/brush.png
       - Iconss/color.png
-      - Iconss/cylinder.png
-      - Iconss/eraser.png
-      - Iconss/export.png
       - Iconss/grab.png
-      - Iconss/hand switch.png
       - Iconss/origin.png
-      - Iconss/polymesh.png
-      - Iconss/preview.png
-      - Iconss/ribbon.png
-      - Iconss/undo.png
       - Iconss/untitled folder/eraser.png
       - Iconss/untitled folder/export.png
       - Iconss/untitled folder/hand switch.png
-      - Iconss/untitled folder/origin.png
       - Iconss/untitled folder/polymesh.png
       - Iconss/untitled folder/preview.png
       - Iconss/untitled folder/ribbon.png
@@ -57,18 +39,14 @@ CollapsedEntities:
       - Image 8.mat
       - Image 9.mat
       - Image.mat
-      - Image.png
       - LSQuickScripts.lspkg
       - LSQuickScripts.lspkg/LSQuickScripts.js
-      - LSQuickScripts.lspkg/package.native
       - MaterialParams.png
-      - Montserrat-Black.ttf
       - Montserrat-Bold.ttf
       - Normal.png
       - PBR 2.mat
       - PBR.mat
       - Plane.mesh
-      - Radio Button.ts
       - SnapDecorators.lspkg
       - SnapDecorators.lspkg/Examples.ts
       - SnapDecorators.lspkg/Examples__PLACE_IN_SCENE.prefab
@@ -658,7 +636,6 @@ CollapsedEntities:
       - SupabaseClient.lspkg/supabase-snapcloud.js
       - SupabaseClient.lspkg/version.json
       - SupabaseProject Spatial Drawer.supabaseProject
-      - Uber PBR.mat
       - Utilities.lspkg
       - Utilities.lspkg/README.md
       - Utilities.lspkg/Scripts/Utils/AnimationUtils.ts
@@ -688,5 +665,4 @@ CollapsedEntities:
       - testGizmo.fbx/Meshes/z2.002
       - testGizmo.fbx/Meshes/z3.002
       - testGizmo.fbx/testGizmo
-      - uber_pbr.ss_graph
   options: 4
