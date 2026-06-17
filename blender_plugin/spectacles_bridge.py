@@ -75,7 +75,7 @@ def make_material(rgb):
     mat.diffuse_color = (rgb[0], rgb[1], rgb[2], 1.0)
     return mat
 
-def create_curve_object(bx, by, bz, user_id, brush_mode, curve_id):
+def create_curve_object(bx, by, bz, user_id, brush_mode, curve_id, stroke_thickness):
     """Create a new Blender curve with the right settings for the brush mode."""
     sc = bpy.context.scene
 
@@ -83,12 +83,12 @@ def create_curve_object(bx, by, bz, user_id, brush_mode, curve_id):
     cdata.dimensions = '3D'
 
     if brush_mode == "ribbon":
-        cdata.extrude      = sc.spectacles_thickness * 0.5
+        cdata.extrude      = stroke_thickness * 0.5
         cdata.bevel_depth  = 0.0
     elif brush_mode == "polyline":
-        cdata.bevel_depth = sc.spectacles_thickness * 0.8
+        cdata.bevel_depth = stroke_thickness * 0.8
     else:
-        cdata.bevel_depth = sc.spectacles_thickness
+        cdata.bevel_depth = stroke_thickness
 
     obj = bpy.data.objects.new("SpectaclesDrawing", cdata)
     bpy.context.collection.objects.link(obj)
@@ -117,8 +117,12 @@ def create_curve_object(bx, by, bz, user_id, brush_mode, curve_id):
 
     # ── First spline point ────────────────────────────────────────────────────
     if brush_mode == "polyline":
-        spline = cdata.splines.new('POLY')
-        spline.points[0].co = (bx, by, bz, 1.0)
+        spline = cdata.splines.new('BEZIER')
+        bp = spline.bezier_points[0]
+        bp.co                = (bx, by, bz)
+        bp.handle_left_type  = 'ALIGNED'
+        bp.handle_right_type = 'ALIGNED'
+        bp.radius            = 1.0
     else:
         spline = cdata.splines.new('BEZIER')
         bp = spline.bezier_points[0]
@@ -147,10 +151,33 @@ def process_events():
 
         # ── Set Origin ────────────────────────────────────────────────────────
         if action == "set-origin":
+            old_origin = {"x": origin_offset["x"], "y": origin_offset["y"], "z": origin_offset["z"]}
+            
             origin_offset["x"] = pt.get("x", 0.0)
             origin_offset["y"] = pt.get("y", 0.0)
             origin_offset["z"] = pt.get("z", 0.0)
-            print(f"[Spectacles] Origin set → {origin_offset}")
+            
+            # Calculate how much the origin shifted in Blender space
+            sc = bpy.context.scene.spectacles_scale
+            # Difference in Lens Studio space
+            dx = old_origin["x"] - origin_offset["x"]
+            dy = old_origin["y"] - origin_offset["y"]
+            dz = old_origin["z"] - origin_offset["z"]
+            
+            # Convert Lens Studio difference to Blender space difference
+            shift_bx = dx * sc
+            shift_by = -dz * sc
+            shift_bz = dy * sc
+            
+            # Move all existing curves so they remain correctly anchored relative to the new origin
+            for cid, entry in curve_registry.items():
+                obj = entry["obj"]
+                if obj:
+                    obj.location.x += shift_bx
+                    obj.location.y += shift_by
+                    obj.location.z += shift_bz
+
+            print(f"[Spectacles] Origin set → {origin_offset}. Shifted {len(curve_registry)} curves.")
             continue
 
         # ── Undo ──────────────────────────────────────────────────────────────
@@ -179,12 +206,15 @@ def process_events():
 
         # ── Set Color ─────────────────────────────────────────────────────────
         if action == "set-color":
-            color_idx  = pt.get("colorIdx", 0)
-            color      = COLOR_PALETTE[color_idx % len(COLOR_PALETTE)]
+            if "r" in pt and "g" in pt and "b" in pt:
+                color = (pt["r"], pt["g"], pt["b"])
+            else:
+                color_idx  = pt.get("colorIdx", 0)
+                color      = COLOR_PALETTE[color_idx % len(COLOR_PALETTE)]
             sc         = bpy.context.scene
-            sc.spectacles_color = (color[0], color[1], color[2])
+            sc.spectacles_color = color
             user_colors[user_id] = color
-            print(f"[Spectacles] Color → index {color_idx} = {color}")
+            print(f"[Spectacles] Color → {color}")
             continue
 
         # ── Erase ─────────────────────────────────────────────────────────────
@@ -293,7 +323,9 @@ def process_events():
         # ── Start Stroke ──────────────────────────────────────────────────────
         if action == "start":
             bx, by, bz = world_to_blender(pt.get("x", 0), pt.get("y", 0), pt.get("z", 0))
-            obj, spline = create_curve_object(bx, by, bz, user_id, brush_mode, curve_id)
+            raw_thickness = pt.get("thickness", 1.0)
+            stroke_thickness = max(0.01, raw_thickness) * bpy.context.scene.spectacles_thickness
+            obj, spline = create_curve_object(bx, by, bz, user_id, brush_mode, curve_id, stroke_thickness)
 
             active_strokes[curve_id] = {
                 "spline":     spline,
@@ -314,9 +346,7 @@ def process_events():
             last_pos    = stroke["last_pos"]
 
             if bmode == "polyline":
-                spline.points.add(1)
-                idx = len(spline.points) - 1
-                spline.points[idx].co = (bx, by, bz, 1.0)
+                pass # Handled by bezier-add and bezier-move instead
 
             else:
                 spline.bezier_points.add(1)
@@ -343,6 +373,37 @@ def process_events():
                     bp.tilt = math.atan2(fz, fy)
 
             stroke["last_pos"] = (bx, by, bz)
+            continue
+
+        # ── Bezier Node Add ───────────────────────────────────────────────────
+        if action == "bezier-add" and curve_id in active_strokes:
+            bx, by, bz  = world_to_blender(pt.get("x", 0), pt.get("y", 0), pt.get("z", 0))
+            stroke      = active_strokes[curve_id]
+            spline      = stroke["spline"]
+            
+            spline.bezier_points.add(1)
+            idx = len(spline.bezier_points) - 1
+            bp  = spline.bezier_points[idx]
+            bp.co                = (bx, by, bz)
+            bp.handle_left_type  = 'ALIGNED'
+            bp.handle_right_type = 'ALIGNED'
+            bp.radius            = 1.0
+            stroke["last_pos"] = (bx, by, bz)
+            continue
+
+        # ── Bezier Handle Move ────────────────────────────────────────────────
+        if action == "bezier-move" and curve_id in active_strokes:
+            bx, by, bz  = world_to_blender(pt.get("x", 0), pt.get("y", 0), pt.get("z", 0))
+            stroke      = active_strokes[curve_id]
+            spline      = stroke["spline"]
+            
+            idx = len(spline.bezier_points) - 1
+            bp  = spline.bezier_points[idx]
+            # Set the right handle to the hand position
+            bp.handle_right = (bx, by, bz)
+            # Make the left handle symmetrical
+            bp.handle_left = (2 * bp.co[0] - bx, 2 * bp.co[1] - by, 2 * bp.co[2] - bz)
+            continue
             continue
 
         # ── End Stroke ────────────────────────────────────────────────────────
@@ -569,7 +630,7 @@ def register():
         name="Channel", description="Realtime channel name", default="spatial-drawer")
     bpy.types.Scene.spectacles_scale = bpy.props.FloatProperty(
         name="Scale", description="Drawing size multiplier",
-        default=10.0, min=1.0, max=1000.0)
+        default=10.0, min=0.01, max=1000.0)
     bpy.types.Scene.spectacles_thickness = bpy.props.FloatProperty(
         name="Thickness", description="Curve bevel depth",
         default=3.0, min=0.001, max=10.0)

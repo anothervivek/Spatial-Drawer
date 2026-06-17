@@ -26,6 +26,8 @@ dock:
                 Uuid: df91b2cf-37e1-401c-83fc-3d9f83343e71
               - persistentName: Snap.Plugin.Gui.Graph.Editor
                 Uuid: 1337b227-d9b9-497e-92e3-f85d2b23a938
+              - persistentName: Snap.Plugin.Gui.ScriptEditor
+                Uuid: 14b14327-d383-4537-93e2-51dbbcff0631
             type: section
             current: 0
           - items:
@@ -34,8 +36,8 @@ dock:
             type: section
             current: 0
         sizes:
-          - 396
-          - 539
+          - 748
+          - 187
         type: splitter
         orientation: vertical
       - items:
@@ -50,25 +52,8 @@ dock:
         current: 0
     sizes:
       - 300
-      - 636
-      - 410
+      - 718
+      - 328
       - 365
     type: splitter
     orientation: horizontal
-  windows:
-    - items:
-        - items:
-            - persistentName: Snap.Plugin.Gui.AssetLibraryPanel
-              Uuid: 317a0558-75db-4efe-91b1-6d1002865be6
-          type: section
-          current: 0
-      sizes:
-        - 678
-      type: splitter
-      orientation: vertical
-      geometry:
-        x: 302
-        y: 202
-        w: 1124
-        h: 680
-      screen: Built-in Retina Display

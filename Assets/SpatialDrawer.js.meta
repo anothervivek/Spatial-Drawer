@@ -26,22 +26,29 @@
   ExportUid: 00000000-0000-0000-0000-000000000000
   PackagePolicy: CanBeUnpacked
   ScriptInputsHidden:
-    btnAIGen: false
-    btnColor1: false
-    btnColor2: false
-    btnColor3: false
-    btnColor4: false
+    btnBrushMenu: false
     btnColors: false
     btnEraser: false
     btnExport: false
+    btnGrab: false
+    btnHandedness: false
     btnPoly: false
+    btnPreview: false
     btnRibbon: false
     btnSetOrigin: false
     btnTube: false
     btnUndo: false
+    centerTextObj: false
     channelName: false
+    colorPaletteParent: false
+    colors: false
     gridPlane: false
     originGizmo: false
+    previewMaterial: false
+    radialButtonSize: false
+    radialRadius: false
+    radialSubButtonSize: false
+    radialSubRadius: false
     supabaseProject: false
   ScriptTypesHidden:
     {}
@@ -56,19 +63,27 @@
       channelName: spatial-drawer
       originGizmo: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       gridPlane: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      btnBrushMenu: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       btnTube: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       btnRibbon: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       btnPoly: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       btnEraser: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       btnExport: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
-      btnAIGen: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      btnPreview: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      btnHandedness: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      previewMaterial: !<reference.Material> 00000000-0000-0000-0000-000000000000
       btnSetOrigin: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       btnUndo: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       btnColors: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
-      btnColor1: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
-      btnColor2: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
-      btnColor3: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
-      btnColor4: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      colorPaletteParent: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      colors: !<Vec4[]>
+        []
+      radialRadius: !<float> 7.000000
+      radialSubRadius: !<float> 12.000000
+      radialButtonSize: 3.500000
+      radialSubButtonSize: 3.500000
+      centerTextObj: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      btnGrab: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
   ScriptTypes:
     -
       {}

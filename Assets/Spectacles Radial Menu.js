@@ -192,6 +192,11 @@ function Create(){
     this.buttonSize = 3;
 
     /**
+     * @description Local sub-button size. Default is 3.
+    */
+    this.subButtonSize = 3;
+
+    /**
      * @description Offset the radial's rotation (radians 0-2pi, clockwise). Default is 0.
     */
     this.radialRotation = 0;
@@ -450,9 +455,9 @@ function Create(){
         var buttonTrf = sceneObject.getTransform();
 
         // make animators
-        var subShowAnim = createSubShowAnim(buttonTrf, self.buttonSize);
-        var highlightAnim = createHighlightAnim(buttonTrf, self.buttonSize);
-        var pressAnim = createPressAnim(buttonTrf, self.buttonSize);
+        var subShowAnim = createSubShowAnim(buttonTrf, self.subButtonSize);
+        var highlightAnim = createHighlightAnim(buttonTrf, self.subButtonSize);
+        var pressAnim = createPressAnim(buttonTrf, self.subButtonSize);
 
         // register
         var button = {
@@ -555,7 +560,7 @@ function Create(){
                     // transform
                     subButton.buttonTrf.setLocalPosition(localPos);
                     subButton.buttonTrf.setLocalRotation(noRotation);
-                    subButton.buttonTrf.setLocalScale(vec3.one().uniformScale(self.buttonSize));
+                    subButton.buttonTrf.setLocalScale(vec3.one().uniformScale(self.subButtonSize));
 
                     // reset anims on start (in case of user-wrapped functions on the updateFunctions)
                     subButton.highlightAnim.pulse(0);
