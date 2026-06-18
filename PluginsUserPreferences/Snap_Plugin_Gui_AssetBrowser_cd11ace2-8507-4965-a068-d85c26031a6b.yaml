@@ -1,7 +1,7 @@
 CollapsedEntities:
   type: stringset
   value:
-    size: 662
+    size: 663
     values:
       - Base.png
       - Color Picker Wheel.lsc
@@ -649,6 +649,7 @@ CollapsedEntities:
       - Utilities.lspkg/Scripts/Utils/ValidationUtils.ts
       - Utilities.lspkg/package.native
       - flat.ss_graph
+      - mask copy.png
       - pbr.ss_graph
       - testGizmo.fbx
       - testGizmo.fbx/.hidden

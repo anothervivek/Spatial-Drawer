@@ -73,7 +73,8 @@ var realtimeChannel = null;
 
 var isDrawing      = false;
 var isGrabbing     = false;
-var bezierActiveCurveId = null;
+var bezierActiveCurveId  = null;
+var bezierLastAnchorPos  = null; // world position of last tapped bezier point (for handle vector)
 var activeCurveId  = "";
 
 var lastSendTimeMs   = 0;
@@ -84,6 +85,7 @@ var GRAB_HOLD_SEC    = 1.0;
 var DRAW_MIN_DIST = 1.5;
 var lastGrabPos      = null;
 var lastSendPos      = null;
+var grabStartHandPos = null; // hand position at moment of grab-start
 
 // Menu hand pinch state (for feeding to radial menu)
 var menuPinching       = false;
@@ -96,93 +98,14 @@ var currentBuilder = null;
 var currentTrailPoints = [];
 var previewTrails = []; // Store them to clear on undo
 var centerTextRef = null; // Shared reference for radial center text
-var grabHandlesRoot = null;
+var manualGrabbedTrail = null;
+var manualGrabOffset = vec3.zero();
+var lastBrushMode = "tube"; // remembers last active brush before switching to grab
 
-// ── Grab Handle: lazily attach SIK Interactable+Manipulation to a trail ──────
-function attachGrabHandle(trail) {
-    if (!script.originGizmo || !trail || trail.isDestroyed || trail.grabHandle) return;
-    
-    // Create a temporary root so copyWholeHierarchy always has a valid parent
-    var tempRoot = global.scene.createSceneObject("_grabTemp");
-    var grabHandle = script.originGizmo.copyWholeHierarchy(tempRoot);
-    
-    // Un-parent from temp root and move to a dedicated grab handles root
-    if (!grabHandlesRoot) grabHandlesRoot = global.scene.createSceneObject("GrabHandlesRoot");
-    grabHandle.setParent(grabHandlesRoot);
-    tempRoot.destroy();
-    
-    grabHandle.name = "GrabHandle_" + (trail.name || "trail");
-    grabHandle.enabled = true;
-    
-    // Remove visual children — we only want the SIK scripts + collider
-    while (grabHandle.getChildrenCount() > 0) grabHandle.getChild(0).destroy();
-    var oldVis = grabHandle.getComponents("Component.RenderMeshVisual");
-    for (var v = 0; v < oldVis.length; v++) oldVis[v].destroy();
-    
-    // Position at the trail's anchor (first drawn point)
-    var anchor = trail.anchorPos || vec3.zero();
-    grabHandle.getTransform().setWorldPosition(anchor);
-    grabHandle.getTransform().setLocalScale(vec3.one());
-    
-    // Force a valid BoxShape collider (30cm) so it's always grabbable
-    var colliders = grabHandle.getComponents("Physics.ColliderComponent");
-    for (var c = 0; c < colliders.length; c++) {
-        var shape = Shape.createBoxShape();
-        shape.size = new vec3(30, 30, 30);
-        colliders[c].shape = shape;
-        colliders[c].fitVisual = false;
-    }
-    
-    // Ensure the manipulation script moves THIS handle, not the original gizmo
-    var scripts = grabHandle.getComponents("Component.ScriptComponent");
-    for (var s = 0; s < scripts.length; s++) {
-        if (scripts[s].setManipulateRoot !== undefined) {
-            scripts[s].setManipulateRoot(grabHandle.getTransform());
-        }
-    }
-    
-    // Parent trail under grab handle so moving the handle moves the mesh
-    trail.setParent(grabHandle);
-    // Preserve trail world transform so vertices stay in place
-    trail.getTransform().setWorldPosition(vec3.zero());
-    trail.getTransform().setWorldRotation(quat.quatIdentity());
-    trail.getTransform().setWorldScale(vec3.one());
-    
-    trail.grabHandle = grabHandle;
-    print("[SpatialDrawer] Attached grab handle to " + trail.name);
-}
-
-// ── Destroy a trail and its grab handle cleanly ──────────────────────────────
+// ── Destroy a trail cleanly ──────────────────────────────────────────────
 function destroyTrail(trail) {
     if (!trail || trail.isDestroyed) return;
-    var handle = trail.grabHandle;
-    if (handle && !handle.isDestroyed) {
-        // Un-parent trail first so it can be destroyed independently
-        trail.setParent(null);
-        handle.destroy();
-    }
     trail.destroy();
-}
-
-function updateGrabColliders(enabled) {
-    for (var i = 0; i < previewTrails.length; i++) {
-        var trail = previewTrails[i];
-        if (!trail || trail.isDestroyed) continue;
-        
-        // Lazily create grab handle when entering grab mode
-        if (enabled && !trail.grabHandle) {
-            attachGrabHandle(trail);
-        }
-        
-        var handle = trail.grabHandle;
-        if (handle && !handle.isDestroyed) {
-            // Only toggle the colliders; toggling SIK scripts breaks their internal state
-            var colliders = handle.getComponents("Physics.ColliderComponent");
-            for (var c = 0; c < colliders.length; c++) {
-                colliders[c].enabled = enabled;
-            }
-        }
-    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -268,14 +191,16 @@ function buildRadialMenu() {
     var bUndo    = radialMenu.addButton(getOrCreateButton(script.btnUndo, "undo"),      "undo");
     var bHand    = radialMenu.addButton(getOrCreateButton(script.btnHandedness, "hands"), "hands");
 
-    bindButtonHoverState(bPreview, "Preview AR", script.btnPreview);
-    bindButtonHoverState(bBrushes, "Brushes", script.btnBrushMenu);
-    bindButtonHoverState(bGrab, "Grab Tool", script.btnGrab);
-    bindButtonHoverState(bColors, "Colors", script.btnColors);
-    bindButtonHoverState(bOrigin, "Set Origin", script.btnSetOrigin);
-    bindButtonHoverState(bExport, "Export", script.btnExport);
-    bindButtonHoverState(bUndo, "Undo", script.btnUndo);
-    bindButtonHoverState(bHand, "Swap Hands", script.btnHandedness);
+    // Radio-state buttons: sceneObj passed so active/inactive visual persists correctly
+    bindButtonHoverState(bPreview, "Preview AR",  script.btnPreview);
+    bindButtonHoverState(bGrab,    "Grab Tool",   script.btnGrab);
+    bindButtonHoverState(bHand,    "Swap Hands",  script.btnHandedness);
+    // Action / sub-menu-parent buttons: pass null so no setState is called — prevents stuck "active" visuals
+    bindButtonHoverState(bBrushes, "Brushes",     null);
+    bindButtonHoverState(bColors,  "Colors",      null);
+    bindButtonHoverState(bOrigin,  "Set Origin",  null);
+    bindButtonHoverState(bExport,  "Export",      null);
+    bindButtonHoverState(bUndo,    "Undo",        null);
 
     // ── Brush sub-buttons ──────────────────────────────────────────────────
     var bTube   = radialMenu.addSubButton("brushes", getOrCreateButton(script.btnTube, "tube"),      "tube");
@@ -323,45 +248,54 @@ function buildRadialMenu() {
 
     var brushButtons = [script.btnTube, script.btnRibbon, script.btnPoly, script.btnEraser, script.btnGrab];
 
-    // ── Brush mode callbacks ───────────────────────────────────────────────
+    // Returns the SceneObject button for a given brush mode name
+    function getBrushButton(mode) {
+        if (mode === "tube")     return script.btnTube;
+        if (mode === "ribbon")   return script.btnRibbon;
+        if (mode === "polyline") return script.btnPoly;
+        if (mode === "eraser")   return script.btnEraser;
+        return script.btnTube; // fallback
+    }
+
+    // Activate a brush mode and update radio state (does not touch grab)
+    function activateBrush(mode) {
+        brushMode = mode;
+        lastBrushMode = mode;
+        if (mode !== "polyline") {
+            bezierActiveCurveId = null;
+            bezierLastAnchorPos = null;
+        }
+        setRadioButtonState(brushButtons, getBrushButton(mode));
+        print("[SpatialDrawer] Brush → " + mode.toUpperCase());
+    }
+
+    // ── Grab toggle: active ↔ inactive; restores last brush when deactivated ──
     bGrab.onPress.add(function() {
-        brushMode = "grab";
-        bezierActiveCurveId = null;
-        updateGrabColliders(true);
-        setRadioButtonState(brushButtons, script.btnGrab);
-        print("[SpatialDrawer] Brush → GRAB");
+        if (brushMode === "grab") {
+            // Tap grab again → deactivate, restore last brush
+            activateBrush(lastBrushMode);
+        } else {
+            // Activate grab, remember current brush
+            lastBrushMode = brushMode;
+            brushMode = "grab";
+            setRadioButtonState(brushButtons, script.btnGrab);
+            print("[SpatialDrawer] Brush -> GRAB");
+        }
     });
 
-    bTube.onPress.add(function() {
-        brushMode      = "tube";
-        bezierActiveCurveId = null;
-        updateGrabColliders(false);
-        setRadioButtonState(brushButtons, script.btnTube);
-        print("[SpatialDrawer] Brush → TUBE");
+    // ── Brush menu button tapped directly (no sub-button chosen) → restore last brush ──
+    bBrushes.onPress.add(function() {
+        if (brushMode === "grab") {
+            activateBrush(lastBrushMode);
+        }
+        // If already in brush mode, the sub-button choice handles the switch; nothing extra needed
     });
 
-    bRibbon.onPress.add(function() {
-        brushMode      = "ribbon";
-        bezierActiveCurveId = null;
-        updateGrabColliders(false);
-        setRadioButtonState(brushButtons, script.btnRibbon);
-        print("[SpatialDrawer] Brush → RIBBON");
-    });
-
-    bPoly.onPress.add(function() {
-        brushMode = "polyline";
-        updateGrabColliders(false);
-        setRadioButtonState(brushButtons, script.btnPoly);
-        print("[SpatialDrawer] Brush → POLYLINE");
-    });
-
-    bEraser.onPress.add(function() {
-        brushMode      = "eraser";
-        bezierActiveCurveId = null;
-        updateGrabColliders(false);
-        setRadioButtonState(brushButtons, script.btnEraser);
-        print("[SpatialDrawer] Brush → ERASER");
-    });
+    // ── Brush sub-button callbacks ─────────────────────────────────────────
+    bTube.onPress.add(function()   { activateBrush("tube"); });
+    bRibbon.onPress.add(function() { activateBrush("ribbon"); });
+    bPoly.onPress.add(function()   { activateBrush("polyline"); });
+    bEraser.onPress.add(function() { activateBrush("eraser"); });
 
     bExport.onPress.add(function() {
         var pos = getDrawHand().isTracked() ? getDrawHand().indexTip.position : getMenuHand().indexTip.position;
@@ -369,6 +303,7 @@ function buildRadialMenu() {
         print("[SpatialDrawer] Action → EXPORT");
     });
 
+    // ── Visibility toggle: active by default, tapping flips active/inactive ──
     bPreview.onPress.add(function() {
         isPreviewEnabled = !isPreviewEnabled;
         for (var i = 0; i < previewTrails.length; i++) {
@@ -376,6 +311,7 @@ function buildRadialMenu() {
                 previewTrails[i].enabled = isPreviewEnabled;
             }
         }
+        setRadioButtonState([script.btnPreview], isPreviewEnabled ? script.btnPreview : null);
         print("[SpatialDrawer] AR Preview: " + (isPreviewEnabled ? "ON" : "OFF"));
     });
 
@@ -418,7 +354,6 @@ function buildRadialMenu() {
                         payload.b = cv.b;
                     }
                     send("set-color", leftHand.indexTip.position, payload);
-                    setRadioButtonState(internalColorPalette, internalColorPalette[colorIdx]);
                     print("[SpatialDrawer] Color → " + colorIdx);
                 });
             }
@@ -466,11 +401,10 @@ function buildRadialMenu() {
     });
 
     // ── Initialize default button states ────────────────────────────────────
-    setRadioButtonState(brushButtons, script.btnTube);
+    setRadioButtonState(brushButtons, script.btnTube);           // tube brush active by default
+    setRadioButtonState([script.btnPreview], script.btnPreview); // visibility ON by default
     setRadioButtonState([script.btnHandedness], isLeftHanded ? script.btnHandedness : null);
-    if (internalColorPalette.length > 0) {
-        setRadioButtonState(internalColorPalette, internalColorPalette[0]); // Default to first color
-    }
+    // colors: no default radio state — they highlight on hover only
 
     print("[SpatialDrawer] ✅ Radial Menu ready! centerTextRef=" + (centerTextRef ? "OK" : "NULL"))
 }
@@ -482,11 +416,53 @@ function onDrawHandPinchDown() {
     try {
         var drawHand = getDrawHand();
         if (!drawHand.isTracked()) return;
-        
-        if (brushMode === "grab") return; // SIK handles grabbing
 
         var pos = drawHand.indexTip.position;
         var nowMs = getTime() * 1000;
+        
+        if (brushMode === "grab") {
+            var closestTrail = null;
+            var minDist = 99999;
+            for (var i = 0; i < previewTrails.length; i++) {
+                var t = previewTrails[i];
+                if (!t || t.isDestroyed || !t.bounds) continue;
+                
+                // Get absolute bounds dynamically
+                var wpos = t.getTransform().getWorldPosition();
+                var min = t.bounds.min.add(wpos).sub(new vec3(15,15,15)); // 15cm grab radius padding
+                var max = t.bounds.max.add(wpos).add(new vec3(15,15,15));
+                
+                // Bounding box collision check
+                if (pos.x >= min.x && pos.x <= max.x &&
+                    pos.y >= min.y && pos.y <= max.y &&
+                    pos.z >= min.z && pos.z <= max.z) {
+                    
+                    var center = min.add(max).uniformScale(0.5);
+                    var d = pos.distance(center);
+                    if (d < minDist) {
+                        minDist = d;
+                        closestTrail = t;
+                    }
+                }
+            }
+            if (closestTrail) {
+                isGrabbing = true;
+                manualGrabbedTrail = closestTrail;
+                // Offset: trail's current world origin minus hand position, so the trail follows the hand delta exactly
+                var trailOrigin = closestTrail.getTransform().getWorldPosition();
+                manualGrabOffset = trailOrigin.sub(pos);
+                grabStartHandPos = pos;
+
+                // Extract curve ID to notify blender
+                var nameParts = closestTrail.name.replace("PreviewTrail_", "");
+                activeCurveId = nameParts;
+
+                send("grab-start", pos, { ox: trailOrigin.x, oy: trailOrigin.y, oz: trailOrigin.z });
+                print("[SpatialDrawer] Manually grabbed curve: " + activeCurveId);
+            }
+            return;
+        }
+
         var extras = {};
 
         if (brushMode === "ribbon") {
@@ -495,28 +471,30 @@ function onDrawHandPinchDown() {
         }
 
         if (brushMode === "polyline") {
+            bezierLastAnchorPos = pos;
             if (!bezierActiveCurveId) {
                 bezierActiveCurveId = "curve_" + userId + "_" + nowMs;
                 activeCurveId = bezierActiveCurveId;
-                if (brushMode !== "eraser") {
-                    currentTrail = global.scene.createSceneObject("PreviewTrail_" + activeCurveId);
-                    currentTrail.enabled = isPreviewEnabled;
-                    currentTrail.anchorPos = new vec3(pos.x, pos.y, pos.z);
-                    var rmv = currentTrail.createComponent("Component.RenderMeshVisual");
-                    if (script.previewMaterial) rmv.mainMaterial = script.previewMaterial.clone();
-                    currentBuilder = new MeshBuilder([ { name: "position", components: 3 } ]);
-                    currentBuilder.topology = MeshTopology.LineStrip;
-                    currentTrailPoints = [pos.x, pos.y, pos.z];
-                    currentBuilder.appendVerticesInterleaved(currentTrailPoints);
-                    currentBuilder.updateMesh();
-                    rmv.mesh = currentBuilder.getMesh();
-                    previewTrails.push(currentTrail);
-                }
+                currentTrail = global.scene.createSceneObject("PreviewTrail_" + activeCurveId);
+                currentTrail.enabled = isPreviewEnabled;
+                currentTrail.anchorPos = new vec3(pos.x, pos.y, pos.z);
+                var rmv = currentTrail.createComponent("Component.RenderMeshVisual");
+                if (script.previewMaterial) rmv.mainMaterial = script.previewMaterial.clone();
+                currentBuilder = new MeshBuilder([ { name: "position", components: 3 } ]);
+                currentBuilder.topology = MeshTopology.LineStrip;
+                currentTrailPoints = [pos.x, pos.y, pos.z];
+                currentBuilder.appendVerticesInterleaved(currentTrailPoints);
+                currentBuilder.updateMesh();
+                rmv.mesh = currentBuilder.getMesh();
+                previewTrails.push(currentTrail);
+                currentTrail.bounds = { min: new vec3(pos.x, pos.y, pos.z), max: new vec3(pos.x, pos.y, pos.z) };
+                print("[BEZ] CURVE START — id=" + activeCurveId.slice(-8) + " pos=(" + pos.x.toFixed(1) + "," + pos.y.toFixed(1) + "," + pos.z.toFixed(1) + ")");
                 send("start", pos, extras);
             } else {
                 activeCurveId = bezierActiveCurveId;
+                print("[BEZ] ADD POINT #" + (currentTrailPoints.length / 3) + " pos=(" + pos.x.toFixed(1) + "," + pos.y.toFixed(1) + "," + pos.z.toFixed(1) + ")");
                 send("bezier-add", pos, extras);
-                if (brushMode !== "eraser" && currentBuilder && currentTrail) {
+                if (currentBuilder && currentTrail) {
                     currentTrailPoints.push(pos.x, pos.y, pos.z);
                     currentBuilder.appendVerticesInterleaved([pos.x, pos.y, pos.z]);
                     currentBuilder.updateMesh();
@@ -536,7 +514,7 @@ function onDrawHandPinchDown() {
         pinchHoldTimer = 0;
         lastGrabPos = pos;
         
-        // Start AR Preview Mesh
+        // Start AR Preview Mesh (eraser has no preview trail)
         if (brushMode !== "eraser") {
             currentTrail = global.scene.createSceneObject("PreviewTrail_" + activeCurveId);
             currentTrail.enabled = isPreviewEnabled;
@@ -550,8 +528,9 @@ function onDrawHandPinchDown() {
             currentBuilder.updateMesh();
             rmv.mesh = currentBuilder.getMesh();
             previewTrails.push(currentTrail);
+            currentTrail.bounds = { min: new vec3(pos.x, pos.y, pos.z), max: new vec3(pos.x, pos.y, pos.z) };
+            send("start", pos, extras); // don't send "start" for eraser — Blender would try to create a curve
         }
-        send("start", pos, extras);
         lastSendTimeMs = nowMs;
         lastSendPos = pos;
     } catch (e) {
@@ -563,15 +542,35 @@ function onDrawHandPinchUp() {
     try {
         var drawHand = getDrawHand();
         if (isGrabbing) {
-            send("grab-end", drawHand.indexTip.position, null);
+            var pos = drawHand.isTracked() ? drawHand.indexTip.position : vec3.zero();
+            
+            if (brushMode === "grab" && manualGrabbedTrail) {
+                // Broadcast final SceneObject world position so Blender knows the total displacement
+                pos = manualGrabbedTrail.getTransform().getWorldPosition();
+                var handDelta = drawHand.isTracked() ? drawHand.indexTip.position.sub(grabStartHandPos) : vec3.zero();
+                send("grab-end", pos, { dx: handDelta.x, dy: handDelta.y, dz: handDelta.z });
+                manualGrabbedTrail = null;
+                grabStartHandPos = null;
+                isGrabbing = false;
+                print("[SpatialDrawer] Grab END");
+                return;
+            }
+            
+            send("grab-end", pos, null);
             isGrabbing = false;
             print("[SpatialDrawer] Grab END");
             return;
         }
-        if (!isDrawing || brushMode === "polyline") return;
+        if (!isDrawing) return;
+        if (brushMode === "eraser") return; // eraser only uses discrete "erase" events
+        if (brushMode === "polyline") {
+            isDrawing = false;
+            print("[BEZ] HANDLE RELEASED — isDrawing=false, ready for next tap");
+            return;
+        }
         send("end", drawHand.indexTip.position, null);
         isDrawing = false;
-        currentBuilder = null; // stop mesh preview for this stroke
+        currentBuilder = null;
         print("[SpatialDrawer] Draw END");
     } catch (e) {
         print("[SpatialDrawer] onDrawHandPinchUp error: " + e);
@@ -678,6 +677,7 @@ function onUpdate() {
     var dt    = getDeltaTime();
     var nowMs = getTime() * 1000;
 
+
     try {
         var drawHand = getDrawHand();
         var menuHand = getMenuHand();
@@ -721,14 +721,7 @@ function onUpdate() {
             }
         }
 
-        // ── Grab streaming ───────────────────────────────────────────────
-        if (isGrabbing && drawHand.isTracked()) {
-            if (nowMs - lastSendTimeMs > sendIntervalMs) {
-                send("grab-move", drawHand.indexTip.position, null);
-                lastSendTimeMs = nowMs;
-            }
-            return;
-        }
+
 
         // ── Origin Gizmo Interactive Drag Tracking ───────────────────────
         if (script.originGizmo) {
@@ -750,6 +743,28 @@ function onUpdate() {
                     }
                 }
             }
+        }
+
+        // ── Legacy Grab Streaming (Hold 1s) ──────────────────────────────
+        if (isGrabbing && brushMode !== "grab" && drawHand.isTracked()) {
+            if (nowMs - lastSendTimeMs > sendIntervalMs) {
+                send("grab-move", drawHand.indexTip.position, null);
+                lastSendTimeMs = nowMs;
+            }
+            return;
+        }
+
+        // ── Custom Grab Streaming ────────────────────────────────────────
+        if (isGrabbing && brushMode === "grab" && manualGrabbedTrail && !manualGrabbedTrail.isDestroyed && drawHand.isTracked()) {
+            var gpos = drawHand.indexTip.position;
+            var newPos = gpos.add(manualGrabOffset);
+            manualGrabbedTrail.getTransform().setWorldPosition(newPos);
+            
+            if (nowMs - lastSendTimeMs > sendIntervalMs) {
+                send("grab-move", newPos, null);
+                lastSendTimeMs = nowMs;
+            }
+            return;
         }
 
         // ── Erase streaming ──────────────────────────────────────────────
@@ -780,12 +795,25 @@ function onUpdate() {
         var pos = drawHand.indexTip.position;
         var dist = pos.distance(lastSendPos);
 
-        // Bezier Handle Move
+        // Bezier handle drag — send handle vector relative to the tapped anchor point
+        // Blender uses: handle_right = anchor + handle, handle_left = anchor - handle (symmetric)
         if (brushMode === "polyline") {
-            // When pinching and moving in polyline mode, we are adjusting the curve handle!
-            if (dist > DRAW_MIN_DIST) {
-                send("bezier-move", pos, null);
+            if (dist > DRAW_MIN_DIST && bezierLastAnchorPos) {
+                var hx = pos.x - bezierLastAnchorPos.x;
+                var hy = pos.y - bezierLastAnchorPos.y;
+                var hz = pos.z - bezierLastAnchorPos.z;
+                print("[BEZ] HANDLE DRAG — h=(" + hx.toFixed(1) + "," + hy.toFixed(1) + "," + hz.toFixed(1) + ") dist=" + dist.toFixed(1) + "cm");
+                send("bezier-move", bezierLastAnchorPos, { hx: hx, hy: hy, hz: hz });
                 lastSendPos = pos;
+                if (currentTrail && currentTrail.bounds) {
+                    var b = currentTrail.bounds;
+                    b.min.x = Math.min(b.min.x, pos.x);
+                    b.min.y = Math.min(b.min.y, pos.y);
+                    b.min.z = Math.min(b.min.z, pos.z);
+                    b.max.x = Math.max(b.max.x, pos.x);
+                    b.max.y = Math.max(b.max.y, pos.y);
+                    b.max.z = Math.max(b.max.z, pos.z);
+                }
             }
             return;
         }
@@ -802,6 +830,16 @@ function onUpdate() {
                 send("move", pos, extras);
                 lastSendTimeMs = nowMs;
                 lastSendPos = pos;
+                
+                if (currentTrail && currentTrail.bounds) {
+                    var b = currentTrail.bounds;
+                    b.min.x = Math.min(b.min.x, pos.x);
+                    b.min.y = Math.min(b.min.y, pos.y);
+                    b.min.z = Math.min(b.min.z, pos.z);
+                    b.max.x = Math.max(b.max.x, pos.x);
+                    b.max.y = Math.max(b.max.y, pos.y);
+                    b.max.z = Math.max(b.max.z, pos.z);
+                }
                 
                 // Update AR Preview Mesh dynamically!
                 if (brushMode !== "eraser" && currentBuilder && currentTrail) {

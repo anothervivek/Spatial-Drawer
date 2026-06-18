@@ -393,17 +393,28 @@ def process_events():
 
         # ── Bezier Handle Move ────────────────────────────────────────────────
         if action == "bezier-move" and curve_id in active_strokes:
-            bx, by, bz  = world_to_blender(pt.get("x", 0), pt.get("y", 0), pt.get("z", 0))
-            stroke      = active_strokes[curve_id]
-            spline      = stroke["spline"]
-            
+            stroke     = active_strokes[curve_id]
+            spline     = stroke["spline"]
+            sc_factor  = bpy.context.scene.spectacles_scale
+
+            # hx/hy/hz is the handle vector in Lens Studio space (current_hand - anchor).
+            # Convert to Blender space using only scale + axis-swap (no origin offset — it's a vector).
+            # world_to_blender maps: bx = (x-ox)*sc, by = -(z-oz)*sc, bz = (y-oy)*sc
+            # So for a pure vector: bx = hx*sc, by = -hz*sc, bz = hy*sc
+            hls_x = pt.get("hx", 0.0)
+            hls_y = pt.get("hy", 0.0)
+            hls_z = pt.get("hz", 0.0)
+            bhx =  hls_x * sc_factor
+            bhy = -hls_z * sc_factor
+            bhz =  hls_y * sc_factor
+
             idx = len(spline.bezier_points) - 1
             bp  = spline.bezier_points[idx]
-            # Set the right handle to the hand position
-            bp.handle_right = (bx, by, bz)
-            # Make the left handle symmetrical
-            bp.handle_left = (2 * bp.co[0] - bx, 2 * bp.co[1] - by, 2 * bp.co[2] - bz)
-            continue
+            # Handles in Blender are absolute positions: co ± handle_vector
+            bp.handle_right_type = 'FREE'
+            bp.handle_left_type  = 'FREE'
+            bp.handle_right = (bp.co[0] + bhx, bp.co[1] + bhy, bp.co[2] + bhz)
+            bp.handle_left  = (bp.co[0] - bhx, bp.co[1] - bhy, bp.co[2] - bhz)
             continue
 
         # ── End Stroke ────────────────────────────────────────────────────────
