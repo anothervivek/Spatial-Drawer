@@ -28,6 +28,21 @@ graph LR
 *   **Holographic Radial Menu:** Double-pinch to open a fully customized interactive menu at your hand's position to select brushes, colors, swap active hands, undo strokes, set the origin, toggle AR previews, or trigger export.
 *   **Set Workspace Origin:** Align the virtual grid to any physical surface using the draggable origin gizmo.
 *   **One-Tap FBX Export:** Taps "Export" in AR to automatically merge, clean, and export all drawn curves as a single `.fbx` mesh directly to your Desktop.
+*   **Stable Blender Plugin (`v1.1.0`):** Proper `bl_info` header so the plugin installs and activates correctly via Blender's Add-on manager without any Text Editor workaround.
+
+---
+
+## 📋 Changelog
+
+### Phase 1
+
+**Blender Plugin (`spectacles_bridge.py`) — v1.1.0**
+- Added `bl_info` metadata block — plugin now installs cleanly via **Edit > Preferences > Add-ons > Install** and shows up in the add-on list with version, author, and category.
+- Implemented `clear-all` event handler — pressing **Clear All** in AR now removes all curves from Blender's scene and resets the curve registry, active strokes, and undo stack in one go.
+
+**Lens Studio (`SpatialDrawer.js`)**
+- Fixed **Clear All button** visual state — the button no longer lingers in a highlighted/selected state after being pressed; it fires the action and returns immediately to its default appearance.
+- Radial menu button hover state cleanup — action buttons (Clear All, Export, Undo, Origin) correctly return to `default` state after interaction; only toggle/radio buttons (brush type, Preview, Handedness) hold active state.
 
 ---
 

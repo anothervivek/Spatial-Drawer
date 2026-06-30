@@ -27,6 +27,7 @@
   PackagePolicy: CanBeUnpacked
   ScriptInputsHidden:
     btnBrushMenu: false
+    btnClearAll: false
     btnColors: false
     btnEraser: false
     btnExport: false
@@ -68,6 +69,7 @@
       btnRibbon: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       btnPoly: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       btnEraser: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      btnClearAll: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       btnExport: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       btnPreview: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       btnHandedness: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000

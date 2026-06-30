@@ -12,6 +12,7 @@
 // @input SceneObject btnRibbon {"hint": "Sub-button: Ribbon brush"}
 // @input SceneObject btnPoly {"hint": "Sub-button: Polyline brush"}
 // @input SceneObject btnEraser {"hint": "Sub-button: Eraser"}
+// @input SceneObject btnClearAll {"hint": "Sub-button: Clear All strokes"}
 // @input SceneObject btnExport {"hint": "Button visual for Export"}
 // @input SceneObject btnPreview {"hint": "Button visual for AR Preview Toggle"}
 // @input SceneObject btnHandedness {"hint": "Button visual for Hand Toggle"}
@@ -27,6 +28,7 @@
 // @input float radialSubRadius = 12.0 {"hint": "Radius of the sub menu ring (cm)"}
 // @input float radialButtonSize = 3.5 {"hint": "Size of the main buttons"}
 // @input float radialSubButtonSize = 3.5 {"hint": "Size of the sub buttons"}
+
 // @input SceneObject centerTextObj {"hint": "Optional: SceneObject with Text component to show button names"}
 // @input SceneObject btnGrab {"hint": "Button visual for Grab tool"}
 
@@ -203,15 +205,17 @@ function buildRadialMenu() {
     bindButtonHoverState(bUndo,    "Undo",        null);
 
     // ── Brush sub-buttons ──────────────────────────────────────────────────
-    var bTube   = radialMenu.addSubButton("brushes", getOrCreateButton(script.btnTube, "tube"),      "tube");
-    var bRibbon = radialMenu.addSubButton("brushes", getOrCreateButton(script.btnRibbon, "ribbon"),  "ribbon");
-    var bPoly   = radialMenu.addSubButton("brushes", getOrCreateButton(script.btnPoly, "poly"),      "poly");
-    var bEraser = radialMenu.addSubButton("brushes", getOrCreateButton(script.btnEraser, "eraser"),  "eraser");
+    var bTube     = radialMenu.addSubButton("brushes", getOrCreateButton(script.btnTube, "tube"),          "tube");
+    var bRibbon   = radialMenu.addSubButton("brushes", getOrCreateButton(script.btnRibbon, "ribbon"),      "ribbon");
+    var bPoly     = radialMenu.addSubButton("brushes", getOrCreateButton(script.btnPoly, "poly"),          "poly");
+    var bEraser   = radialMenu.addSubButton("brushes", getOrCreateButton(script.btnEraser, "eraser"),      "eraser");
+    var bClearAll = radialMenu.addSubButton("brushes", getOrCreateButton(script.btnClearAll, "clearall"),  "clearall");
 
-    bindButtonHoverState(bTube, "Tube Brush", script.btnTube);
-    bindButtonHoverState(bRibbon, "Ribbon Brush", script.btnRibbon);
-    bindButtonHoverState(bPoly, "Polyline Brush", script.btnPoly);
-    bindButtonHoverState(bEraser, "Eraser", script.btnEraser);
+    bindButtonHoverState(bTube,     "Tube Brush",  script.btnTube);
+    bindButtonHoverState(bRibbon,   "Ribbon Brush",script.btnRibbon);
+    bindButtonHoverState(bPoly,     "Polyline Brush", script.btnPoly);
+    bindButtonHoverState(bEraser,   "Eraser",      script.btnEraser);
+    bindButtonHoverState(bClearAll, "Clear All",   null);
 
     // ── Build color array from parent ─────────────────────────────────────────
     var internalColorPalette = [];
@@ -296,6 +300,30 @@ function buildRadialMenu() {
     bRibbon.onPress.add(function() { activateBrush("ribbon"); });
     bPoly.onPress.add(function()   { activateBrush("polyline"); });
     bEraser.onPress.add(function() { activateBrush("eraser"); });
+
+    bClearAll.onPress.add(function() {
+        for (var i = 0; i < previewTrails.length; i++) {
+            destroyTrail(previewTrails[i]);
+        }
+        previewTrails = [];
+        currentTrail = null;
+        currentBuilder = null;
+        currentTrailPoints = [];
+        isDrawing = false;
+        isGrabbing = false;
+        manualGrabbedTrail = null;
+        bezierActiveCurveId = null;
+        bezierLastAnchorPos = null;
+        send("clear-all", getMenuHand().indexTip.position, null);
+        // Force button back to unhighlighted — Clear All is a one-shot action, never stays "selected"
+        if (script.btnClearAll) {
+            var cls = script.btnClearAll.getComponents("Component.ScriptComponent");
+            for (var j = 0; j < cls.length; j++) {
+                if (cls[j].setState !== undefined) cls[j].setState("default");
+            }
+        }
+        print("[SpatialDrawer] CLEAR ALL");
+    });
 
     bExport.onPress.add(function() {
         var pos = getDrawHand().isTracked() ? getDrawHand().indexTip.position : getMenuHand().indexTip.position;
@@ -480,7 +508,7 @@ function onDrawHandPinchDown() {
                 currentTrail.anchorPos = new vec3(pos.x, pos.y, pos.z);
                 var rmv = currentTrail.createComponent("Component.RenderMeshVisual");
                 if (script.previewMaterial) rmv.mainMaterial = script.previewMaterial.clone();
-                currentBuilder = new MeshBuilder([ { name: "position", components: 3 } ]);
+                currentBuilder = new MeshBuilder([{ name: "position", components: 3 }]);
                 currentBuilder.topology = MeshTopology.LineStrip;
                 currentTrailPoints = [pos.x, pos.y, pos.z];
                 currentBuilder.appendVerticesInterleaved(currentTrailPoints);
@@ -521,7 +549,7 @@ function onDrawHandPinchDown() {
             currentTrail.anchorPos = new vec3(pos.x, pos.y, pos.z);
             var rmv = currentTrail.createComponent("Component.RenderMeshVisual");
             if (script.previewMaterial) rmv.mainMaterial = script.previewMaterial.clone();
-            currentBuilder = new MeshBuilder([ { name: "position", components: 3 } ]);
+            currentBuilder = new MeshBuilder([{ name: "position", components: 3 }]);
             currentBuilder.topology = MeshTopology.LineStrip;
             currentTrailPoints = [pos.x, pos.y, pos.z];
             currentBuilder.appendVerticesInterleaved(currentTrailPoints);
@@ -628,7 +656,10 @@ async function connectToSnapCloud() {
             script.supabaseProject.publicToken,
             { realtime: { heartbeatIntervalMs: 2500 } }
         );
-        await client.auth.signInWithIdToken({ provider: "snapchat", token: "" });
+        // Auth only works on-device (not in Lens Studio preview); skip gracefully
+        try { await client.auth.signInWithSnapchat(); } catch (authErr) {
+            print("[SpatialDrawer] Auth skipped (preview mode): " + authErr);
+        }
         realtimeChannel = client.channel(script.channelName, {
             config: { broadcast: { self: false } }
         });
@@ -841,14 +872,12 @@ function onUpdate() {
                     b.max.z = Math.max(b.max.z, pos.z);
                 }
                 
-                // Update AR Preview Mesh dynamically!
+                // Update AR Preview Mesh
                 if (brushMode !== "eraser" && currentBuilder && currentTrail) {
                     currentTrailPoints.push(pos.x, pos.y, pos.z);
                     currentBuilder.appendVerticesInterleaved([pos.x, pos.y, pos.z]);
                     var idx = (currentTrailPoints.length / 3) - 1;
-                    if (idx > 0) {
-                        currentBuilder.appendIndices([idx - 1, idx]);
-                    }
+                    if (idx > 0) currentBuilder.appendIndices([idx - 1, idx]);
                     currentBuilder.updateMesh();
                     currentTrail.getComponent("Component.RenderMeshVisual").mesh = currentBuilder.getMesh();
                 }

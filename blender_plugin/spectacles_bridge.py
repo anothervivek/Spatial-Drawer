@@ -1,3 +1,13 @@
+bl_info = {
+    "name": "Spatial Drawer — Spectacles Bridge",
+    "author": "Vivek Singh",
+    "version": (1, 1, 0),
+    "blender": (4, 0, 0),
+    "location": "3D Viewport > Sidebar > Spectacles",
+    "description": "Receives real-time drawing data from Spectacles via Supabase and builds curves in Blender",
+    "category": "3D View",
+}
+
 import bpy
 import json
 import threading
@@ -278,6 +288,17 @@ def process_events():
                 bpy.context.scene.spectacles_status_msg = "Export Failed!"
                 
             bpy.ops.object.delete()
+            continue
+
+        # ── Clear All ─────────────────────────────────────────────────────────
+        if action == "clear-all":
+            for cid, entry in list(curve_registry.items()):
+                try: bpy.data.objects.remove(entry["obj"], do_unlink=True)
+                except: pass
+            curve_registry.clear()
+            active_strokes.clear()
+            drawn_stack.clear()
+            print("[Spectacles] CLEAR ALL")
             continue
 
         # ── Grab Start ────────────────────────────────────────────────────────
