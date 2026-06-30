@@ -22,6 +22,8 @@
 // @input SceneObject btnColors {"hint": "Button to open Colors sub-menu"}
 // @input SceneObject colorPaletteParent {"hint": "Parent object holding color buttons as children"}
 // @input vec4[] colors {"widget": "color", "hint": "List of matching colors"}
+// @input SceneObject btnSize {"hint": "Main ring button for Brush Size"}
+// @input SceneObject sizePaletteParent {"hint": "Parent object holding size sub-buttons as children (XS→XL order)"}
 
 // ─── Radial Menu Customization ────────────────────────────────────────────────
 // @input float radialRadius = 7.0 {"hint": "Radius of the main menu ring (cm)"}
@@ -95,9 +97,30 @@ var lastMenuPinchMs    = 0;
 var menuOpenPosition   = null;
 
 // AR Preview State
+var currentColor = new vec4(1, 1, 1, 1); // active stroke color, updated when user picks a color
+
 var currentTrail = null;
+var currentRmv   = null;   // cached RMV for the active ribbon stroke
 var currentBuilder = null;
 var currentTrailPoints = [];
+var ribbonHalfWidth = 0.8; // cm, half-width of the ribbon strip
+var ribbonVertCount = 0;   // verts committed to currentBuilder so far
+
+// Tube brush state (ATC-style 3D tube, full rebuild each sample)
+var tubeTrailData   = [];   // [{pos: vec3, refVec: vec3}]
+var tubeLastRefVec  = null;
+var tubeRadius      = 0.8;  // cm
+var tubeFaces       = 8;
+
+// Polyline tube state (separate builder, rebuilt on each anchor tap)
+var polyTubeRadius  = 0.5;
+var polyTubeFaces   = 8;
+var polyAnchorPoints = [];
+var polyRefVectors   = [];
+var polyLastRefVec   = null;
+var polyTubeBuilder  = null;
+var polyTubeRmv      = null;
+
 var previewTrails = []; // Store them to clear on undo
 var centerTextRef = null; // Shared reference for radial center text
 var manualGrabbedTrail = null;
@@ -108,6 +131,178 @@ var lastBrushMode = "tube"; // remembers last active brush before switching to g
 function destroyTrail(trail) {
     if (!trail || trail.isDestroyed) return;
     trail.destroy();
+}
+
+// ── Stable reference vector — evolves to prevent tube twisting ───────────
+function getStablePolyRef(dir) {
+    if (!polyLastRefVec) polyLastRefVec = vec3.up();
+    var dot = dir.dot(polyLastRefVec);
+    var proj = polyLastRefVec.sub(dir.uniformScale(dot));
+    if (proj.length < 0.001) {
+        var alt = Math.abs(dir.dot(vec3.up())) < 0.9 ? vec3.up() : vec3.forward();
+        dot = dir.dot(alt);
+        proj = alt.sub(dir.uniformScale(dot));
+    }
+    polyLastRefVec = proj.normalize();
+    return polyLastRefVec;
+}
+
+// ── Circle of verts around pos, perpendicular to dir ────────────────────
+function getCircleVerts(pos, dir, refVec, radius, faceCount) {
+    var perp = dir.cross(refVec);
+    if (perp.length < 0.001) perp = dir.cross(vec3.up());
+    if (perp.length < 0.001) perp = dir.cross(vec3.right());
+    perp = perp.normalize().uniformScale(radius);
+    var step = (2 * Math.PI) / faceCount;
+    var verts = [];
+    for (var i = 0; i < faceCount; i++) {
+        verts.push(quat.angleAxis(i * step, dir).multiplyVec3(perp).add(pos));
+    }
+    return verts;
+}
+
+// ── Erase all verts + indices from a builder so it can be reused ─────────
+function clearMeshBuilder(b) {
+    if (!b) return;
+    try {
+        var vc = b.getVerticesCount();
+        if (vc > 0) { b.eraseVertices(0, vc); b.eraseIndices(0, b.getIndicesCount()); }
+    } catch(e) {}
+}
+
+// ── Full tube rebuild from polyAnchorPoints ──────────────────────────────
+function rebuildPolyTube() {
+    if (!polyTubeBuilder || !polyTubeRmv) return;
+    clearMeshBuilder(polyTubeBuilder);
+    var n = polyAnchorPoints.length;
+    if (n < 2) return;
+
+    var fc = polyTubeFaces;
+    var r  = polyTubeRadius;
+    var allIndices = [];
+    var prevLastIdx = -1;
+
+    for (var i = 0; i < n - 1; i++) {
+        var p1 = polyAnchorPoints[i];
+        var p2 = polyAnchorPoints[i + 1];
+        var seg = p2.sub(p1);
+        if (seg.length < 0.001) continue;
+        var dir = seg.normalize();
+
+        var ring1 = getCircleVerts(p1, dir, polyRefVectors[i],     r, fc);
+        var ring2 = getCircleVerts(p2, dir, polyRefVectors[i + 1], r, fc);
+
+        var base = polyTubeBuilder.getVerticesCount();
+
+        // fc+1 pairs: ring[0..fc-1] + ring[0] to close the loop
+        for (var j = 0; j <= fc; j++) {
+            var v1 = ring1[j % fc];
+            var v2 = ring2[j % fc];
+            polyTubeBuilder.appendVerticesInterleaved([v1.x, v1.y, v1.z, v2.x, v2.y, v2.z]);
+        }
+
+        var firstIdx = base;
+        var lastIdx  = base + fc * 2 + 1;
+
+        // Degenerate bridge from previous segment
+        if (prevLastIdx >= 0) {
+            allIndices.push(prevLastIdx, prevLastIdx, firstIdx, firstIdx);
+        }
+
+        // Strip indices: ring1[0], ring2[0], ring1[1], ring2[1], ..., ring1[0], ring2[0]
+        for (var k = 0; k <= fc; k++) {
+            allIndices.push(base + k * 2, base + k * 2 + 1);
+        }
+
+        prevLastIdx = lastIdx;
+    }
+
+    if (allIndices.length > 0) polyTubeBuilder.appendIndices(allIndices);
+    polyTubeRmv.mesh = polyTubeBuilder.getMesh();
+    polyTubeBuilder.updateMesh();
+}
+
+// ── ATC-faithful tube helpers ─────────────────────────────────────────────
+
+function getStableTubeRef(dir) {
+    if (!tubeLastRefVec) tubeLastRefVec = vec3.up();
+    var dot = dir.dot(tubeLastRefVec);
+    var proj = tubeLastRefVec.sub(dir.uniformScale(dot));
+    if (proj.length < 0.001) {
+        var alt = Math.abs(dir.dot(vec3.up())) < 0.9 ? vec3.up() : vec3.forward();
+        dot = dir.dot(alt);
+        proj = alt.sub(dir.uniformScale(dot));
+    }
+    tubeLastRefVec = proj.normalize();
+    return tubeLastRefVec;
+}
+
+function getTubeCircle(pos, dir, refVec, radius, fc) {
+    // Check length BEFORE normalize to avoid NaN when cross product is near-zero (ATC bug fix)
+    var perp = dir.cross(refVec);
+    if (perp.length < 0.001) perp = dir.cross(vec3.up());
+    if (perp.length < 0.001) perp = dir.cross(vec3.forward());
+    perp = perp.normalize().uniformScale(radius);
+    var step = (2 * Math.PI) / fc;
+    var verts = [];
+    for (var i = 0; i < fc; i++) {
+        verts.push(quat.angleAxis(i * step, dir).multiplyVec3(perp).add(pos));
+    }
+    return verts;
+}
+
+// Direct port of ATC's rebuildMesh + addSegmentWithGradient
+function rebuildTubeMesh() {
+    if (!currentBuilder || !currentRmv) return;
+
+    var vc = currentBuilder.getVerticesCount();
+    if (vc > 0) { currentBuilder.eraseVertices(0, vc); currentBuilder.eraseIndices(0, currentBuilder.getIndicesCount()); }
+
+    var n = tubeTrailData.length;
+    if (n < 2) return;
+
+    var fc = tubeFaces;
+    var r  = tubeRadius;
+
+    for (var i = 0; i < n - 1; i++) {
+        var d1 = tubeTrailData[i];
+        var d2 = tubeTrailData[i + 1];
+        var dir = d2.pos.sub(d1.pos);
+        if (dir.length < 0.001) continue;
+        dir = dir.normalize();
+
+        var cs1 = getTubeCircle(d1.pos, dir, d1.refVec, r, fc);
+        var cs2 = getTubeCircle(d2.pos, dir, d2.refVec, r, fc);
+
+        var startIdx = currentBuilder.getVerticesCount();
+
+        for (var j = 0; j < fc; j++) {
+            var n1 = cs1[j].sub(d1.pos).normalize();
+            var n2 = cs2[j].sub(d2.pos).normalize();
+            currentBuilder.appendVertices([[cs1[j].x, cs1[j].y, cs1[j].z], [n1.x, n1.y, n1.z]]);
+            currentBuilder.appendVertices([[cs2[j].x, cs2[j].y, cs2[j].z], [n2.x, n2.y, n2.z]]);
+        }
+
+        if (i > 0) {
+            // ATC join: bridge from last ring of prev segment to first ring of this segment
+            var lastSegEnd = startIdx - (2 * fc - 1);
+            for (var jj = 0; jj < fc * 2; jj += 2) {
+                currentBuilder.appendIndices([lastSegEnd + jj, startIdx + jj]);
+            }
+            // ATC's degenerate-triangle seam fix (doubles both anchor indices)
+            currentBuilder.appendIndices([lastSegEnd, lastSegEnd, startIdx, startIdx]);
+        }
+
+        // Main strip for this segment
+        var seg = [];
+        for (var k = 0; k < fc * 2; k++) seg.push(startIdx + k);
+        currentBuilder.appendIndices(seg);
+        currentBuilder.appendIndices([startIdx, startIdx + 1]); // close the ring
+    }
+
+    // ATC's finalizeMesh pattern: getMesh() BEFORE updateMesh()
+    currentRmv.mesh = currentBuilder.getMesh();
+    currentBuilder.updateMesh();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -182,40 +377,72 @@ function buildRadialMenu() {
         });
     }
 
-    // ── Main ring buttons ──────────────────────────────────────────────────
-    // Ordered to place Brushes near 135 deg and Colors near 225 deg
-    var bPreview = radialMenu.addButton(getOrCreateButton(script.btnPreview, "preview"),  "preview");
-    var bBrushes = radialMenu.addButton(getOrCreateButton(script.btnBrushMenu, "brushes"), "brushes");
-    var bGrab    = radialMenu.addButton(getOrCreateButton(script.btnGrab, "grab"), "grab");
-    var bColors  = radialMenu.addButton(getOrCreateButton(script.btnColors, "colors"), "colors");
-    var bOrigin  = radialMenu.addButton(getOrCreateButton(script.btnSetOrigin, "origin"), "origin");
-    var bExport  = radialMenu.addButton(getOrCreateButton(script.btnExport, "export"),    "export");
-    var bUndo    = radialMenu.addButton(getOrCreateButton(script.btnUndo, "undo"),      "undo");
-    var bHand    = radialMenu.addButton(getOrCreateButton(script.btnHandedness, "hands"), "hands");
+    // ── Main ring buttons (10 total) ───────────────────────────────────────
+    var bPreview  = radialMenu.addButton(getOrCreateButton(script.btnPreview,    "preview"),  "preview");
+    var bBrushes  = radialMenu.addButton(getOrCreateButton(script.btnBrushMenu,  "brushes"),  "brushes");
+    var bSize     = radialMenu.addButton(getOrCreateButton(script.btnSize,        "size"),     "size");
+    var bGrab     = radialMenu.addButton(getOrCreateButton(script.btnGrab,        "grab"),     "grab");
+    var bColors   = radialMenu.addButton(getOrCreateButton(script.btnColors,      "colors"),   "colors");
+    var bOrigin   = radialMenu.addButton(getOrCreateButton(script.btnSetOrigin,   "origin"),   "origin");
+    var bExport   = radialMenu.addButton(getOrCreateButton(script.btnExport,      "export"),   "export");
+    var bUndo     = radialMenu.addButton(getOrCreateButton(script.btnUndo,        "undo"),     "undo");
+    var bClearAll = radialMenu.addButton(getOrCreateButton(script.btnClearAll,    "clearall"), "clearall");
+    var bHand     = radialMenu.addButton(getOrCreateButton(script.btnHandedness,  "hands"),    "hands");
 
-    // Radio-state buttons: sceneObj passed so active/inactive visual persists correctly
-    bindButtonHoverState(bPreview, "Preview AR",  script.btnPreview);
-    bindButtonHoverState(bGrab,    "Grab Tool",   script.btnGrab);
-    bindButtonHoverState(bHand,    "Swap Hands",  script.btnHandedness);
-    // Action / sub-menu-parent buttons: pass null so no setState is called — prevents stuck "active" visuals
-    bindButtonHoverState(bBrushes, "Brushes",     null);
-    bindButtonHoverState(bColors,  "Colors",      null);
-    bindButtonHoverState(bOrigin,  "Set Origin",  null);
-    bindButtonHoverState(bExport,  "Export",      null);
-    bindButtonHoverState(bUndo,    "Undo",        null);
+    // Radio-state buttons
+    bindButtonHoverState(bPreview,  "Preview AR",   script.btnPreview);
+    bindButtonHoverState(bGrab,     "Grab Tool",    script.btnGrab);
+    bindButtonHoverState(bHand,     "Swap Hands",   script.btnHandedness);
+    // Action / sub-menu-parent buttons: null = no stuck active visual
+    bindButtonHoverState(bBrushes,  "Brushes",      null);
+    bindButtonHoverState(bSize,     "Brush Size",   null);
+    bindButtonHoverState(bColors,   "Colors",       null);
+    bindButtonHoverState(bOrigin,   "Set Origin",   null);
+    bindButtonHoverState(bExport,   "Export",       null);
+    bindButtonHoverState(bUndo,     "Undo",         null);
+    bindButtonHoverState(bClearAll, "Clear All",    null);
 
-    // ── Brush sub-buttons ──────────────────────────────────────────────────
-    var bTube     = radialMenu.addSubButton("brushes", getOrCreateButton(script.btnTube, "tube"),          "tube");
-    var bRibbon   = radialMenu.addSubButton("brushes", getOrCreateButton(script.btnRibbon, "ribbon"),      "ribbon");
-    var bPoly     = radialMenu.addSubButton("brushes", getOrCreateButton(script.btnPoly, "poly"),          "poly");
-    var bEraser   = radialMenu.addSubButton("brushes", getOrCreateButton(script.btnEraser, "eraser"),      "eraser");
-    var bClearAll = radialMenu.addSubButton("brushes", getOrCreateButton(script.btnClearAll, "clearall"),  "clearall");
+    // ── Brush sub-buttons (4 brushes, no Clear All) ───────────────────────
+    var bTube   = radialMenu.addSubButton("brushes", getOrCreateButton(script.btnTube,   "tube"),   "tube");
+    var bRibbon = radialMenu.addSubButton("brushes", getOrCreateButton(script.btnRibbon, "ribbon"), "ribbon");
+    var bPoly   = radialMenu.addSubButton("brushes", getOrCreateButton(script.btnPoly,   "poly"),   "poly");
+    var bEraser = radialMenu.addSubButton("brushes", getOrCreateButton(script.btnEraser, "eraser"), "eraser");
 
-    bindButtonHoverState(bTube,     "Tube Brush",  script.btnTube);
-    bindButtonHoverState(bRibbon,   "Ribbon Brush",script.btnRibbon);
-    bindButtonHoverState(bPoly,     "Polyline Brush", script.btnPoly);
-    bindButtonHoverState(bEraser,   "Eraser",      script.btnEraser);
-    bindButtonHoverState(bClearAll, "Clear All",   null);
+    bindButtonHoverState(bTube,   "Tube Brush",     script.btnTube);
+    bindButtonHoverState(bRibbon, "Ribbon Brush",   script.btnRibbon);
+    bindButtonHoverState(bPoly,   "Polyline Brush", script.btnPoly);
+    bindButtonHoverState(bEraser, "Eraser",         script.btnEraser);
+
+    // ── Size sub-buttons (auto-detected from sizePaletteParent children) ──
+    var sizeValues = [0.3, 0.5, 0.8, 1.3, 2.0]; // XS → XL tube radius in cm
+    var sizeLabels = ["XS", "S", "M", "L", "XL"];
+    var sizeSceneObjs = [];
+    if (script.sizePaletteParent) {
+        var sizeChildCount = script.sizePaletteParent.getChildrenCount();
+        for (var s = 0; s < sizeChildCount; s++) {
+            sizeSceneObjs.push(script.sizePaletteParent.getChild(s));
+        }
+    }
+    var sizeBtns = [];
+    for (var si = 0; si < sizeSceneObjs.length; si++) {
+        var sb = radialMenu.addSubButton("size", getOrCreateButton(sizeSceneObjs[si], "size_" + si), "size_" + si);
+        bindButtonHoverState(sb, sizeLabels[si] || ("Size " + si), sizeSceneObjs[si]);
+        sizeBtns.push(sb);
+    }
+
+    // ── Size callbacks ────────────────────────────────────────────────────
+    function applySize(idx) {
+        var r = sizeValues[idx] !== undefined ? sizeValues[idx] : 0.8;
+        tubeRadius       = r;
+        ribbonHalfWidth  = r;
+        polyTubeRadius   = r * 0.6;
+        setRadioButtonState(sizeSceneObjs, sizeSceneObjs[idx]);
+        print("[SpatialDrawer] Size → " + (sizeLabels[idx] || idx) + " (" + r + "cm)");
+    }
+
+    for (var sci = 0; sci < sizeBtns.length; sci++) {
+        (function(idx) { sizeBtns[idx].onPress.add(function() { applySize(idx); }); })(sci);
+    }
 
     // ── Build color array from parent ─────────────────────────────────────────
     var internalColorPalette = [];
@@ -302,20 +529,17 @@ function buildRadialMenu() {
     bEraser.onPress.add(function() { activateBrush("eraser"); });
 
     bClearAll.onPress.add(function() {
-        for (var i = 0; i < previewTrails.length; i++) {
-            destroyTrail(previewTrails[i]);
-        }
+        for (var i = 0; i < previewTrails.length; i++) destroyTrail(previewTrails[i]);
         previewTrails = [];
-        currentTrail = null;
-        currentBuilder = null;
-        currentTrailPoints = [];
-        isDrawing = false;
-        isGrabbing = false;
+        currentTrail = null; currentRmv = null; currentBuilder = null;
+        currentTrailPoints = []; ribbonVertCount = 0;
+        tubeTrailData = []; tubeLastRefVec = null;
+        polyTubeBuilder = null; polyTubeRmv = null;
+        polyAnchorPoints = []; polyRefVectors = []; polyLastRefVec = null;
+        isDrawing = false; isGrabbing = false;
         manualGrabbedTrail = null;
-        bezierActiveCurveId = null;
-        bezierLastAnchorPos = null;
+        bezierActiveCurveId = null; bezierLastAnchorPos = null;
         send("clear-all", getMenuHand().indexTip.position, null);
-        // Force button back to unhighlighted — Clear All is a one-shot action, never stays "selected"
         if (script.btnClearAll) {
             var cls = script.btnClearAll.getComponents("Component.ScriptComponent");
             for (var j = 0; j < cls.length; j++) {
@@ -381,6 +605,10 @@ function buildRadialMenu() {
                         payload.g = cv.g;
                         payload.b = cv.b;
                     }
+                    if (script.colors && colorIdx < script.colors.length) {
+                        var cv2 = script.colors[colorIdx];
+                        currentColor = new vec4(cv2.r, cv2.g, cv2.b, 1.0);
+                    }
                     send("set-color", leftHand.indexTip.position, payload);
                     print("[SpatialDrawer] Color → " + colorIdx);
                 });
@@ -432,7 +660,7 @@ function buildRadialMenu() {
     setRadioButtonState(brushButtons, script.btnTube);           // tube brush active by default
     setRadioButtonState([script.btnPreview], script.btnPreview); // visibility ON by default
     setRadioButtonState([script.btnHandedness], isLeftHanded ? script.btnHandedness : null);
-    // colors: no default radio state — they highlight on hover only
+    if (sizeSceneObjs.length > 2) applySize(2);                  // M size active by default
 
     print("[SpatialDrawer] ✅ Radial Menu ready! centerTextRef=" + (centerTextRef ? "OK" : "NULL"))
 }
@@ -507,13 +735,19 @@ function onDrawHandPinchDown() {
                 currentTrail.enabled = isPreviewEnabled;
                 currentTrail.anchorPos = new vec3(pos.x, pos.y, pos.z);
                 var rmv = currentTrail.createComponent("Component.RenderMeshVisual");
-                if (script.previewMaterial) rmv.mainMaterial = script.previewMaterial.clone();
-                currentBuilder = new MeshBuilder([{ name: "position", components: 3 }]);
-                currentBuilder.topology = MeshTopology.LineStrip;
+                if (script.previewMaterial) {
+                    rmv.mainMaterial = script.previewMaterial.clone();
+                    try { rmv.mainMaterial.mainPass.baseColor = currentColor; } catch(e) {}
+                }
+                polyTubeBuilder = new MeshBuilder([{ name: "position", components: 3 }]);
+                polyTubeBuilder.topology = MeshTopology.TriangleStrip;
+                polyTubeBuilder.indexType = MeshIndexType.UInt16;
+                polyTubeRmv = rmv;
+                polyAnchorPoints = [new vec3(pos.x, pos.y, pos.z)];
+                polyLastRefVec = null;
+                polyRefVectors = [vec3.up()];
                 currentTrailPoints = [pos.x, pos.y, pos.z];
-                currentBuilder.appendVerticesInterleaved(currentTrailPoints);
-                currentBuilder.updateMesh();
-                rmv.mesh = currentBuilder.getMesh();
+                currentBuilder = null;
                 previewTrails.push(currentTrail);
                 currentTrail.bounds = { min: new vec3(pos.x, pos.y, pos.z), max: new vec3(pos.x, pos.y, pos.z) };
                 print("[BEZ] CURVE START — id=" + activeCurveId.slice(-8) + " pos=(" + pos.x.toFixed(1) + "," + pos.y.toFixed(1) + "," + pos.z.toFixed(1) + ")");
@@ -522,10 +756,15 @@ function onDrawHandPinchDown() {
                 activeCurveId = bezierActiveCurveId;
                 print("[BEZ] ADD POINT #" + (currentTrailPoints.length / 3) + " pos=(" + pos.x.toFixed(1) + "," + pos.y.toFixed(1) + "," + pos.z.toFixed(1) + ")");
                 send("bezier-add", pos, extras);
-                if (currentBuilder && currentTrail) {
+                if (polyTubeBuilder && currentTrail) {
+                    var lastP = polyAnchorPoints[polyAnchorPoints.length - 1];
+                    var newP  = new vec3(pos.x, pos.y, pos.z);
+                    var segDir = newP.sub(lastP);
+                    segDir = segDir.length > 0.001 ? segDir.normalize() : vec3.forward();
+                    polyAnchorPoints.push(newP);
+                    polyRefVectors.push(getStablePolyRef(segDir));
                     currentTrailPoints.push(pos.x, pos.y, pos.z);
-                    currentBuilder.appendVerticesInterleaved([pos.x, pos.y, pos.z]);
-                    currentBuilder.updateMesh();
+                    rebuildPolyTube();
                 }
             }
             isDrawing = true;
@@ -548,13 +787,27 @@ function onDrawHandPinchDown() {
             currentTrail.enabled = isPreviewEnabled;
             currentTrail.anchorPos = new vec3(pos.x, pos.y, pos.z);
             var rmv = currentTrail.createComponent("Component.RenderMeshVisual");
-            if (script.previewMaterial) rmv.mainMaterial = script.previewMaterial.clone();
-            currentBuilder = new MeshBuilder([{ name: "position", components: 3 }]);
-            currentBuilder.topology = MeshTopology.LineStrip;
+            if (script.previewMaterial) {
+                rmv.mainMaterial = script.previewMaterial.clone();
+                try { rmv.mainMaterial.mainPass.baseColor = currentColor; } catch(e) {}
+            }
+            currentRmv = rmv;
             currentTrailPoints = [pos.x, pos.y, pos.z];
-            currentBuilder.appendVerticesInterleaved(currentTrailPoints);
-            currentBuilder.updateMesh();
-            rmv.mesh = currentBuilder.getMesh();
+            if (brushMode === "tube") {
+                // ATC-style 3D tube — needs normals, full rebuild each point
+                currentBuilder = new MeshBuilder([
+                    { name: "position", components: 3 },
+                    { name: "normal",   components: 3, normalized: true }
+                ]);
+                tubeTrailData  = [{ pos: new vec3(pos.x, pos.y, pos.z), refVec: vec3.up() }];
+                tubeLastRefVec = null;
+            } else {
+                // Flat ribbon (ribbon brush) — incremental append, deferred first pair
+                currentBuilder = new MeshBuilder([{ name: "position", components: 3 }]);
+                ribbonVertCount = 0;
+            }
+            currentBuilder.topology = MeshTopology.TriangleStrip;
+            currentBuilder.indexType = MeshIndexType.UInt16;
             previewTrails.push(currentTrail);
             currentTrail.bounds = { min: new vec3(pos.x, pos.y, pos.z), max: new vec3(pos.x, pos.y, pos.z) };
             send("start", pos, extras); // don't send "start" for eraser — Blender would try to create a curve
@@ -599,6 +852,10 @@ function onDrawHandPinchUp() {
         send("end", drawHand.indexTip.position, null);
         isDrawing = false;
         currentBuilder = null;
+        currentRmv = null;
+        ribbonVertCount = 0;
+        tubeTrailData = [];
+        tubeLastRefVec = null;
         print("[SpatialDrawer] Draw END");
     } catch (e) {
         print("[SpatialDrawer] onDrawHandPinchUp error: " + e);
@@ -872,14 +1129,46 @@ function onUpdate() {
                     b.max.z = Math.max(b.max.z, pos.z);
                 }
                 
-                // Update AR Preview Mesh
-                if (brushMode !== "eraser" && currentBuilder && currentTrail) {
+                // Update AR Preview
+                if (brushMode === "tube" && currentBuilder && currentTrail && currentRmv) {
+                    // ATC-style 3D tube: push point + stable ref, full rebuild
+                    var prevTubePt = tubeTrailData[tubeTrailData.length - 1].pos;
+                    var td = pos.sub(prevTubePt);
+                    var tdir = td.length > 0.001 ? td.normalize() : vec3.forward();
+                    tubeTrailData.push({ pos: new vec3(pos.x, pos.y, pos.z), refVec: getStableTubeRef(tdir) });
                     currentTrailPoints.push(pos.x, pos.y, pos.z);
-                    currentBuilder.appendVerticesInterleaved([pos.x, pos.y, pos.z]);
-                    var idx = (currentTrailPoints.length / 3) - 1;
-                    if (idx > 0) currentBuilder.appendIndices([idx - 1, idx]);
+                    rebuildTubeMesh();
+                } else if (brushMode === "ribbon" && currentBuilder && currentTrail && currentRmv) {
+                    // Flat ribbon: incremental 2-vert append
+                    currentTrailPoints.push(pos.x, pos.y, pos.z);
+                    var rn = currentTrailPoints.length / 3;
+                    var rPrev = new vec3(
+                        currentTrailPoints[(rn - 2) * 3],
+                        currentTrailPoints[(rn - 2) * 3 + 1],
+                        currentTrailPoints[(rn - 2) * 3 + 2]);
+                    var rd = pos.sub(rPrev);
+                    var rdir = rd.length > 0.001 ? rd.normalize() : vec3.forward();
+                    var ref = drawHand.indexTip.forward;
+                    var perp = rdir.cross(ref);
+                    if (perp.length < 0.001) perp = rdir.cross(vec3.up());
+                    if (perp.length < 0.001) perp = vec3.right();
+                    perp = perp.normalize().uniformScale(ribbonHalfWidth);
+
+                    if (ribbonVertCount === 0) {
+                        var sp = new vec3(currentTrailPoints[0], currentTrailPoints[1], currentTrailPoints[2]);
+                        var sL = sp.add(perp); var sR = sp.sub(perp);
+                        currentBuilder.appendVerticesInterleaved([sL.x, sL.y, sL.z, sR.x, sR.y, sR.z]);
+                        currentBuilder.appendIndices([0, 1]);
+                        ribbonVertCount = 2;
+                    }
+
+                    var L = pos.add(perp); var R = pos.sub(perp);
+                    currentBuilder.appendVerticesInterleaved([L.x, L.y, L.z, R.x, R.y, R.z]);
+                    currentBuilder.appendIndices([ribbonVertCount, ribbonVertCount + 1]);
+                    ribbonVertCount += 2;
+
                     currentBuilder.updateMesh();
-                    currentTrail.getComponent("Component.RenderMeshVisual").mesh = currentBuilder.getMesh();
+                    currentRmv.mesh = currentBuilder.getMesh();
                 }
             }
         }

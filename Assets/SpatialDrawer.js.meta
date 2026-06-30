@@ -37,6 +37,7 @@
     btnPreview: false
     btnRibbon: false
     btnSetOrigin: false
+    btnSize: false
     btnTube: false
     btnUndo: false
     centerTextObj: false
@@ -50,6 +51,7 @@
     radialRadius: false
     radialSubButtonSize: false
     radialSubRadius: false
+    sizePaletteParent: false
     supabaseProject: false
   ScriptTypesHidden:
     {}
@@ -80,6 +82,8 @@
       colorPaletteParent: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       colors: !<Vec4[]>
         []
+      btnSize: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      sizePaletteParent: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       radialRadius: !<float> 7.000000
       radialSubRadius: !<float> 12.000000
       radialButtonSize: 3.500000
