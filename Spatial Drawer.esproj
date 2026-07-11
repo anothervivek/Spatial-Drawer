@@ -13,16 +13,16 @@ metaInfo:
     []
   tags:
     []
-  lensName: Specs Starter
+  lensName: Spatial Drawer
   lensDescriptors:
-    - EXPERIMENTAL_API
+    []
   lensApplicability:
     - Front
     - Back
   lensClientCompatibilities:
     - Spectacles
   platformBundlesEnabled: false
-  iconHash: ""
+  iconHash: b8b793be6ba59dee5700692f26d1f011
   videoPreviewHash: ""
   fromTemplateName: Spectacles
   fromTemplateUrl: Lens Studio 5.15.4.26022322
